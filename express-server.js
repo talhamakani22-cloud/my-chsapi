@@ -9,19 +9,53 @@ const { connectDB } = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 1001;
+const isProduction = process.env.NODE_ENV === 'production';
+const isRender = String(process.env.RENDER || '').toLowerCase() === 'true';
+const forceCrossSiteCookie = String(process.env.SESSION_CROSS_SITE || '').toLowerCase() === 'true' || isRender;
+const allowedOrigins = String(process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+// Required on Render/proxied deployments so secure cookies work correctly.
+app.set('trust proxy', 1);
 
 // Connect to DB once
 connectDB();
 
 // Middleware
-app.use(cors({ origin: true, credentials: true }));
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser tools and same-origin server calls.
+    if (!origin) return callback(null, true);
+
+    if (!allowedOrigins.length) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('CORS origin not allowed'));
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(session({
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false, httpOnly: true, maxAge: 24 * 60 * 60 * 1000 }
+  proxy: true,
+  cookie: {
+    secure: forceCrossSiteCookie ? true : isProduction,
+    httpOnly: true,
+    sameSite: forceCrossSiteCookie ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+  }
 }));
 
 // Routes
