@@ -204,22 +204,12 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
     return null;
   }, [filteredRows]);
 
-  const summaryAmounts = useMemo(() => {
-    if (!filteredRows.length) {
-      return { received: 0, pending: 0 };
-    }
+  const totalPendingForMembers = useMemo(() => {
+    return filteredRows.reduce((sum, row) => sum + Number(row.pendingAmount || 0), 0);
+  }, [filteredRows]);
 
-    const receivedSet = Array.from(
-      new Set(filteredRows.map((row) => Number(row.receivedAmount || 0).toFixed(2)))
-    );
-    const pendingSet = Array.from(
-      new Set(filteredRows.map((row) => Number(row.pendingAmount || 0).toFixed(2)))
-    );
-
-    return {
-      received: receivedSet.length === 1 ? Number(receivedSet[0]) : null,
-      pending: pendingSet.length === 1 ? Number(pendingSet[0]) : null,
-    };
+  const totalReceivedForMembers = useMemo(() => {
+    return filteredRows.reduce((sum, row) => sum + Number(row.receivedAmount || 0), 0);
   }, [filteredRows]);
 
   const canManageRows = scope === 'all';
@@ -275,11 +265,11 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
           </div>
           <div className="erecipets-summary-card">
             <span className="label">Received Amount</span>
-            <strong>{summaryAmounts.received === null ? 'Mixed' : `PKR ${summaryAmounts.received.toFixed(2)}`}</strong>
+            <strong>PKR {totalReceivedForMembers.toFixed(2)}</strong>
           </div>
           <div className="erecipets-summary-card">
             <span className="label">Pending Amount</span>
-            <strong>{summaryAmounts.pending === null ? 'Mixed' : `PKR ${summaryAmounts.pending.toFixed(2)}`}</strong>
+            <strong>PKR {totalPendingForMembers.toFixed(2)}</strong>
           </div>
         </div>
 
@@ -296,6 +286,7 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
                 <th>Status</th>
                 <th>Payment Date</th>
                 <th>Note</th>
+                <th>Slip Proof</th>
                 <th>Received Amount</th>
                 <th>Pending Amount</th>
                 {canManageRows && <th>Actions</th>}
@@ -303,89 +294,111 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
             </thead>
             <tbody>
               {filteredRows.length > 0 ? (
-                filteredRows.map((row) => (
-                  <tr key={String(row.id || row.receiptNo)}>
-                    <td className="emirates-id-cell">{row.receiptNo || '-'}</td>
-                    <td className="name-en-cell">
-                      {editingId === String(row.id || '') ? (
-                        <input className="erecipets-inline-input" value={editForm.ownerName} onChange={(e) => setEditForm((prev) => ({ ...prev, ownerName: e.target.value }))} />
-                      ) : (
-                        row.ownerName || '-'
-                      )}
-                    </td>
-                    <td className="name-en-cell">
-                      {editingId === String(row.id || '') ? (
-                        <input className="erecipets-inline-input" value={editForm.residentName} onChange={(e) => setEditForm((prev) => ({ ...prev, residentName: e.target.value }))} />
-                      ) : (
-                        row.residentName || '-'
-                      )}
-                    </td>
-                    <td>
-                      {editingId === String(row.id || '') ? (
-                        <input className="erecipets-inline-input" value={editForm.flatNumber} onChange={(e) => setEditForm((prev) => ({ ...prev, flatNumber: e.target.value }))} />
-                      ) : (
-                        row.flatNumber || '-'
-                      )}
-                    </td>
-                    <td>
-                      {editingId === String(row.id || '') ? (
-                        <input className="erecipets-inline-input" value={editForm.receiptMonth} onChange={(e) => setEditForm((prev) => ({ ...prev, receiptMonth: e.target.value }))} />
-                      ) : (
-                        row.receiptMonth || '-'
-                      )}
-                    </td>
-                    <td>
-                      {editingId === String(row.id || '') ? (
-                        <input className="erecipets-inline-input" value={editForm.amount} onChange={(e) => setEditForm((prev) => ({ ...prev, amount: e.target.value }))} />
-                      ) : (
-                        `PKR ${Number(row.amount || 0).toFixed(2)}`
-                      )}
-                    </td>
-                    <td>
-                      {editingId === String(row.id || '') ? (
-                        <input className="erecipets-inline-input" value={editForm.status} onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value }))} />
-                      ) : (
-                        <span className={`erecipet-status ${String(row.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
-                          {row.status || '-'}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {editingId === String(row.id || '') ? (
-                        <input className="erecipets-inline-input" value={editForm.paymentDate} onChange={(e) => setEditForm((prev) => ({ ...prev, paymentDate: e.target.value }))} />
-                      ) : (
-                        row.paymentDate || '-'
-                      )}
-                    </td>
-                    <td>
-                      {editingId === String(row.id || '') ? (
-                        <input className="erecipets-inline-input" value={editForm.note} onChange={(e) => setEditForm((prev) => ({ ...prev, note: e.target.value }))} />
-                      ) : (
-                        row.note || '-'
-                      )}
-                    </td>
-                    <td>PKR {Number(row.receivedAmount || 0).toFixed(2)}</td>
-                    <td>PKR {Number(row.pendingAmount || 0).toFixed(2)}</td>
-                    {canManageRows && (
-                      <td>
+                <>
+                  {filteredRows.map((row) => (
+                    <tr key={String(row.id || row.receiptNo)}>
+                      <td className="emirates-id-cell">{row.receiptNo || '-'}</td>
+                      <td className="name-en-cell">
                         {editingId === String(row.id || '') ? (
-                          <div className="erecipets-action-group">
-                            <button className="erecipets-action-btn save" onClick={handleSaveEdit} disabled={savingAction}>Save</button>
-                            <button className="erecipets-action-btn cancel" onClick={cancelEditRow} disabled={savingAction}>Cancel</button>
-                          </div>
+                          <input className="erecipets-inline-input" value={editForm.ownerName} onChange={(e) => setEditForm((prev) => ({ ...prev, ownerName: e.target.value }))} />
                         ) : (
-                          <div className="erecipets-action-group">
-                            <button className="erecipets-action-btn edit" onClick={() => startEditRow(row)} disabled={savingAction}>Edit</button>
-                            <button className="erecipets-action-btn delete" onClick={() => handleDeleteRow(row)} disabled={savingAction}>Delete</button>
-                          </div>
+                          row.ownerName || '-'
                         )}
                       </td>
-                    )}
+                      <td className="name-en-cell">
+                        {editingId === String(row.id || '') ? (
+                          <input className="erecipets-inline-input" value={editForm.residentName} onChange={(e) => setEditForm((prev) => ({ ...prev, residentName: e.target.value }))} />
+                        ) : (
+                          row.residentName || '-'
+                        )}
+                      </td>
+                      <td>
+                        {editingId === String(row.id || '') ? (
+                          <input className="erecipets-inline-input" value={editForm.flatNumber} onChange={(e) => setEditForm((prev) => ({ ...prev, flatNumber: e.target.value }))} />
+                        ) : (
+                          row.flatNumber || '-'
+                        )}
+                      </td>
+                      <td>
+                        {editingId === String(row.id || '') ? (
+                          <input className="erecipets-inline-input" value={editForm.receiptMonth} onChange={(e) => setEditForm((prev) => ({ ...prev, receiptMonth: e.target.value }))} />
+                        ) : (
+                          row.receiptMonth || '-'
+                        )}
+                      </td>
+                      <td>
+                        {editingId === String(row.id || '') ? (
+                          <input className="erecipets-inline-input" value={editForm.amount} onChange={(e) => setEditForm((prev) => ({ ...prev, amount: e.target.value }))} />
+                        ) : (
+                          `PKR ${Number(row.amount || 0).toFixed(2)}`
+                        )}
+                      </td>
+                      <td>
+                        {editingId === String(row.id || '') ? (
+                          <input className="erecipets-inline-input" value={editForm.status} onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value }))} />
+                        ) : (
+                          <span className={`erecipet-status ${String(row.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
+                            {row.status || '-'}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {editingId === String(row.id || '') ? (
+                          <input className="erecipets-inline-input" value={editForm.paymentDate} onChange={(e) => setEditForm((prev) => ({ ...prev, paymentDate: e.target.value }))} />
+                        ) : (
+                          row.paymentDate || '-'
+                        )}
+                      </td>
+                      <td>
+                        {editingId === String(row.id || '') ? (
+                          <input className="erecipets-inline-input" value={editForm.note} onChange={(e) => setEditForm((prev) => ({ ...prev, note: e.target.value }))} />
+                        ) : (
+                          row.note || '-'
+                        )}
+                      </td>
+                      <td>
+                        {row.paymentSlipUrl ? (
+                          <a
+                            className="erecipets-slip-link"
+                            href={row.paymentSlipUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {row.paymentSlipName ? 'View Slip' : 'Open Proof'}
+                          </a>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td>PKR {Number(row.receivedAmount || 0).toFixed(2)}</td>
+                      <td>PKR {Number(row.pendingAmount || 0).toFixed(2)}</td>
+                      {canManageRows && (
+                        <td>
+                          {editingId === String(row.id || '') ? (
+                            <div className="erecipets-action-group">
+                              <button className="erecipets-action-btn save" onClick={handleSaveEdit} disabled={savingAction}>Save</button>
+                              <button className="erecipets-action-btn cancel" onClick={cancelEditRow} disabled={savingAction}>Cancel</button>
+                            </div>
+                          ) : (
+                            <div className="erecipets-action-group">
+                              <button className="erecipets-action-btn edit" onClick={() => startEditRow(row)} disabled={savingAction}>Edit</button>
+                              <button className="erecipets-action-btn delete" onClick={() => handleDeleteRow(row)} disabled={savingAction}>Delete</button>
+                            </div>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  <tr className="erecipets-total-row">
+                    <td colSpan={canManageRows ? '10' : '10'} className="erecipets-total-label">Totals (All Members)</td>
+                    <td className="erecipets-total-value">PKR {totalReceivedForMembers.toFixed(2)}</td>
+                    <td className="erecipets-total-value">PKR {totalPendingForMembers.toFixed(2)}</td>
+                    {canManageRows && <td />}
                   </tr>
-                ))
+                </>
               ) : (
                 <tr>
-                  <td colSpan={canManageRows ? '12' : '11'} className="no-results">
+                  <td colSpan={canManageRows ? '13' : '12'} className="no-results">
                     No e-recipets found
                   </td>
                 </tr>

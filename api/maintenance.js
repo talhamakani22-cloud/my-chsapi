@@ -118,29 +118,54 @@ router.get('/report', async (req, res) => {
         .toArray();
 
       const receiptIds = receipts.map((r) => r._id);
-      const inboxAgg = receiptIds.length
+      const inboxRows = receiptIds.length
         ? await db
             .collection(INBOX_COLLECTION)
-            .aggregate([
-              { $match: { receiptId: { $in: receiptIds } } },
-              {
-                $group: {
-                  _id: '$receiptId',
-                  totalUsers: { $sum: 1 },
-                  paidUsers: {
-                    $sum: {
-                      $cond: [{ $eq: [{ $toLower: '$status' }, 'paid'] }, 1, 0],
-                    },
-                  },
-                },
-              },
-            ])
+            .find({ receiptId: { $in: receiptIds } })
+            .sort({ updatedAt: -1, createdAt: -1 })
             .toArray()
         : [];
 
-      const byReceiptId = new Map(inboxAgg.map((row) => [String(row._id), row]));
+      const byReceiptId = new Map();
+      for (const row of inboxRows) {
+        const key = String(row.receiptId || '');
+        if (!key) continue;
+
+        if (!byReceiptId.has(key)) {
+          byReceiptId.set(key, {
+            totalUsers: 0,
+            paidUsers: 0,
+            paidSlipCount: 0,
+            paymentSlipUrl: '',
+            paymentSlipName: '',
+          });
+        }
+
+        const stats = byReceiptId.get(key);
+        stats.totalUsers += 1;
+
+        const residentStatus = String(row.status || '').toLowerCase();
+        if (residentStatus === 'paid') {
+          stats.paidUsers += 1;
+        }
+
+        if (row.paymentSlipUrl) {
+          stats.paidSlipCount += 1;
+          if (!stats.paymentSlipUrl) {
+            stats.paymentSlipUrl = row.paymentSlipUrl;
+            stats.paymentSlipName = row.paymentSlipName || '';
+          }
+        }
+      }
+
       const rows = receipts.map((receipt) => {
-        const stats = byReceiptId.get(String(receipt._id)) || { totalUsers: receipt.recipientsCount || 0, paidUsers: 0 };
+        const stats = byReceiptId.get(String(receipt._id)) || {
+          totalUsers: receipt.recipientsCount || 0,
+          paidUsers: 0,
+          paidSlipCount: 0,
+          paymentSlipUrl: '',
+          paymentSlipName: '',
+        };
         const totalUsers = Number(stats.totalUsers || 0);
         const paidUsers = Number(stats.paidUsers || 0);
         const pendingUsers = Math.max(totalUsers - paidUsers, 0);
@@ -164,6 +189,9 @@ router.get('/report', async (req, res) => {
           pendingUsers,
           receivedAmount: isPaid ? amount : 0,
           pendingAmount: isPaid ? 0 : amount,
+          paidSlipCount: Number(stats.paidSlipCount || 0),
+          paymentSlipUrl: stats.paymentSlipUrl || '',
+          paymentSlipName: stats.paymentSlipName || '',
           generatedAt: receipt.generatedAt || receipt.createdAt || null,
         };
       });
@@ -209,6 +237,9 @@ router.get('/report', async (req, res) => {
         pendingUsers: residentStatus === 'paid' ? 0 : 1,
         receivedAmount: residentStatus === 'paid' ? amount : 0,
         pendingAmount: residentStatus === 'paid' ? 0 : amount,
+        paidSlipCount: row.paymentSlipUrl ? 1 : 0,
+        paymentSlipUrl: row.paymentSlipUrl || '',
+        paymentSlipName: row.paymentSlipName || '',
         generatedAt: receipt?.generatedAt || receipt?.createdAt || row.createdAt || null,
       };
     });

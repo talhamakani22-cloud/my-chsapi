@@ -111,6 +111,31 @@
   color: #991b1b;
 }
 
+.erecipets-slip-link {
+  color: #0b5cab;
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+.erecipets-slip-link:hover {
+  color: #083f74;
+}
+
+.erecipets-total-row td {
+  background: #eef6fd;
+  border-top: 2px solid #c4d9ea;
+  font-weight: 700;
+}
+
+.erecipets-total-label {
+  text-align: right;
+  color: #29465c;
+}
+
+.erecipets-total-value {
+  color: #0b3c5d;
+}
+
 @media (max-width: 900px) {
   .erecipets-search {
     min-width: 100%;
