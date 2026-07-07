@@ -6,6 +6,8 @@ import FamilyDetails from './FamilyDetails';
 import VehicleRegistration from './VehicleRegistration';
 import ERecipets from './ERecipets';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
+
 function App() {
   const [screen, setScreen] = useState('login');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -33,7 +35,7 @@ function App() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const res = await fetch('/api/auth/session', { credentials: 'include' });
+        const res = await fetch(`${API_BASE_URL}/api/auth/session`, { credentials: 'include' });
         let data = {};
         try {
           data = await res.json();
@@ -62,7 +64,7 @@ function App() {
 
   const handleLogout = async () => {
     localStorage.removeItem('user');
-    await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+    await fetch(`${API_BASE_URL}/api/logout`, { method: 'POST', credentials: 'include' });
     setIsLoggedIn(false);
     setSessionUser(null);
     setScreen('login');
@@ -78,7 +80,7 @@ function App() {
   if (!isLoggedIn) {
     return <Login onSignInSuccess={async () => {
       // Check session after login
-      const res = await fetch('/api/auth/session', { credentials: 'include' });
+      const res = await fetch(`${API_BASE_URL}/api/auth/session`, { credentials: 'include' });
       let data = {};
       try {
         data = await res.json();
@@ -123,7 +125,7 @@ function App() {
   }
 
   return <Login onSignInSuccess={async () => {
-    const res = await fetch('/api/auth/session', { credentials: 'include' });
+    const res = await fetch(`${API_BASE_URL}/api/auth/session`, { credentials: 'include' });
     let data = {};
     try {
       data = await res.json();

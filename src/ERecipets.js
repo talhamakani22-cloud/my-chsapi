@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import './Report.css';
 import './ERecipets.css';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
+
 function ERecipets({ onBackToDashboard, onRequireLogin }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -19,7 +21,7 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/maintenance/report', { credentials: 'include' });
+      const res = await fetch(`${API_BASE_URL}/api/maintenance/report`, { credentials: 'include' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Failed to fetch e-recipets.');

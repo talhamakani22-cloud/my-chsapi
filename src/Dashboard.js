@@ -15,7 +15,7 @@ function Dashboard({ onNavigateToReport, onNavigateToFamilyDetails, onNavigateTo
       setLoading(true);
       setError('');
       try {
-        const res = await fetch(`${API_BASE_URL}/api/visitors`);
+        const res = await fetch(`${API_BASE_URL}/api/visitors`, { credentials: 'include' });
         const data = await res.json();
         if (data.success) {
           setVisitors(data.visitors);
