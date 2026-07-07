@@ -66,6 +66,7 @@ const familyRouter = require('./api/family');
 const ocrRouter = require('./api/ocr');
 const vehicleRouter = require('./api/vehicle');
 const maintenanceRouter = require('./api/maintenance');
+const notificationsRouter = require('./api/notifications');
 app.use('/api/auth', authRouter);
 app.use('/api/auth', sessionRouter);
 app.use('/api/visitors', visitorsRouter);
@@ -73,6 +74,7 @@ app.use('/api/family', familyRouter);
 app.use('/api/ocr', ocrRouter);
 app.use('/api/vehicle', vehicleRouter);
 app.use('/api/maintenance', maintenanceRouter);
+app.use('/api/notifications', notificationsRouter);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Protected route
