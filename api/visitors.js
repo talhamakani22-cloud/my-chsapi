@@ -1,6 +1,7 @@
 
 const { connectDB } = require('../config/database');
 const Visitor = require('../models/Visitor');
+const { getAccessScope, buildFlatScopedRegex } = require('./accessScope');
 
 const express = require('express');
 const router = express.Router();
@@ -20,8 +21,17 @@ connectDB();
 // GET /api/1001 - Get all visitors
 router.get('/', async (req, res) => {
   try {
+    const access = getAccessScope(req);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
     const { search = '', startDate, endDate } = req.query;
     const query = {};
+
+    if (access.scope === 'resident') {
+      query.houseNumber = { $regex: buildFlatScopedRegex(access.flatNumber) };
+    }
 
     if (search) {
       query.$or = [

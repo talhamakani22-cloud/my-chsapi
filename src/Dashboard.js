@@ -1,7 +1,11 @@
 ﻿import { useEffect, useState } from 'react';
 import './Dashboard.css';
 
-function Dashboard({ onNavigateToReport, onLogout }) {
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
+
+function Dashboard({ onNavigateToReport, onNavigateToFamilyDetails, onNavigateToVehicleRegistration, onNavigateToERecipets, sessionUser, onLogout }) {
+  const loginType = String(sessionUser?.loginType || '').toLowerCase();
+  const isReception = loginType === 'reception';
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -11,7 +15,7 @@ function Dashboard({ onNavigateToReport, onLogout }) {
       setLoading(true);
       setError('');
       try {
-        const res = await fetch('http://localhost:1001/api/visitors');
+        const res = await fetch(`${API_BASE_URL}/api/visitors`);
         const data = await res.json();
         if (data.success) {
           setVisitors(data.visitors);
@@ -60,11 +64,11 @@ function Dashboard({ onNavigateToReport, onLogout }) {
   ];
   const totalVisitorTypes = visitorTypes.reduce((sum, v) => sum + v.count, 0);
 
-  // Recent visitors (last 5 by issueDate or createdAt)
+  // Recent visitors (last 5 by recently added first)
   const recentVisitors = [...visitors]
     .sort((a, b) => {
-      const aDate = new Date(a.issueDate || a.createdAt || 0);
-      const bDate = new Date(b.issueDate || b.createdAt || 0);
+      const aDate = new Date(a.createdAt || a.checkInTime || a.issueDate || 0);
+      const bDate = new Date(b.createdAt || b.checkInTime || b.issueDate || 0);
       return bDate - aDate;
     })
     .slice(0, 5);
@@ -104,8 +108,8 @@ function Dashboard({ onNavigateToReport, onLogout }) {
 
       <div className="dashboard-header">
         <div className="dashboard-title">
-          <h1>Emirates ID Dashboard</h1>
-          <p className="subtitle">Monitor and manage Emirates ID records</p>
+          <h1>Pakistan ID Dashboard 🇵🇰</h1>
+          <p className="subtitle">Monitor and manage Pakistan ID records</p>
         </div>
         <button className="logout-btn" onClick={onLogout}>
           Logout
@@ -215,7 +219,7 @@ function Dashboard({ onNavigateToReport, onLogout }) {
 
         {/* Recent Records Table */}
         <div className="recent-visitors-card">
-          <h3 className="chart-title">Recent Emirates ID Records</h3>
+          <h3 className="chart-title">Recent Pakistan ID Records</h3>
           <div className="visitors-table">
             <div className="table-header">
               <span>Emirates ID</span>
@@ -238,6 +242,27 @@ function Dashboard({ onNavigateToReport, onLogout }) {
       </div>
 
       <div className="dashboard-actions">
+        {!isReception && (
+          <button
+            className="action-btn primary"
+            onClick={onNavigateToFamilyDetails}
+          >
+            Family Details
+          </button>
+        )}
+        {!isReception && (
+          <button
+            className="action-btn primary"
+            onClick={onNavigateToVehicleRegistration}
+          >
+            Vehicle Registration
+          </button>
+        )}
+        {!isReception && (
+          <button className="action-btn primary" onClick={onNavigateToERecipets}>
+            E Recipets
+          </button>
+        )}
         <button className="action-btn primary" onClick={onNavigateToReport}>
           View Reports
         </button>

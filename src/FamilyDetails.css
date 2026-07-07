@@ -1,0 +1,342 @@
+.family-report-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #0f2233;
+  background: linear-gradient(135deg, #0f2233 0%, #14324a 50%, #1b4564 100%);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.family-report-header {
+  position: relative;
+  z-index: 1;
+  background: rgba(10, 30, 46, 0.62);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(120, 170, 205, 0.35);
+  border-radius: 20px;
+  padding: 24px 30px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.family-report-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.family-report-title h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: #e7f3ff;
+  letter-spacing: -0.4px;
+}
+
+.family-report-title .subtitle {
+  margin: 8px 0 0 0;
+  font-size: 14px;
+  color: rgba(82, 121, 146, 0.6);
+}
+
+.family-report-content {
+  position: relative;
+  z-index: 1;
+  background: #eef4f9;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  color: #000;
+}
+
+.family-filters-section {
+  margin-bottom: 18px;
+}
+
+.family-filter-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.family-search-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 290px;
+  flex: 1;
+}
+
+.family-search-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #000;
+}
+
+.family-search-input {
+  padding: 12px 14px;
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  color: #000;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.family-search-input:focus {
+  outline: none;
+  border-color: #58aee6;
+  box-shadow: 0 0 0 3px rgba(63, 143, 202, 0.15);
+}
+
+.family-search-btn,
+.family-refresh-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.family-search-btn {
+  background: linear-gradient(135deg, #58aee6 0%, #9fd7f5 100%);
+  color: #fff;
+}
+
+.family-refresh-btn {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  color: #000;
+}
+
+.family-results-count {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #000;
+}
+
+.family-error {
+  color: #dc2626;
+  margin-left: 10px;
+}
+
+.family-table-wrapper {
+  overflow-x: auto;
+}
+
+.family-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.family-report-table thead {
+  background: #f8f9fa;
+}
+
+.family-report-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 700;
+  color: #000;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.family-report-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #111;
+}
+
+.family-report-table tbody tr:hover {
+  background: #f7fafc;
+}
+
+.family-file-link {
+  color: #0369a1;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.family-file-link:hover {
+  text-decoration: underline;
+}
+
+.family-no-results {
+  text-align: center;
+  color: #475569;
+  padding: 18px;
+}
+
+.family-edit-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+  cursor: pointer;
+}
+
+.family-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.family-edit-modal {
+  width: min(900px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: #eef4f9;
+  border-radius: 16px;
+  border: 1px solid #dbe4ef;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  padding: 18px;
+}
+
+.family-edit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.family-edit-header h3 {
+  margin: 0;
+  color: #0f2233;
+}
+
+.family-close-btn {
+  border: none;
+  background: transparent;
+  font-size: 26px;
+  cursor: pointer;
+  color: #0f2233;
+}
+
+.family-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.family-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.family-edit-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f2233;
+}
+
+.family-edit-grid input,
+.family-member-edit-card input {
+  border: 1px solid #d1dbe7;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.family-members-edit-wrap {
+  background: #f7fafc;
+  border: 1px solid #dbe4ef;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.family-members-edit-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.family-add-member-btn,
+.family-remove-member-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.family-add-member-btn {
+  color: #fff;
+  background: #0284c7;
+}
+
+.family-remove-member-btn {
+  color: #fff;
+  background: #ef4444;
+}
+
+.family-member-edit-card {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr 1fr 0.9fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.family-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.family-cancel-btn,
+.family-save-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.family-cancel-btn {
+  background: #e5e7eb;
+  color: #0f2233;
+}
+
+.family-save-btn {
+  color: #fff;
+  background: linear-gradient(135deg, #58aee6 0%, #9fd7f5 100%);
+}
+
+@media (max-width: 768px) {
+  .family-report-content {
+    padding: 16px;
+  }
+
+  .family-search-group {
+    min-width: 100%;
+  }
+
+  .family-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .family-member-edit-card {
+    grid-template-columns: 1fr;
+  }
+}

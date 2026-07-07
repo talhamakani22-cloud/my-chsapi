@@ -2,7 +2,7 @@ import { useState } from 'react';
 import './Login.css';
 
 function Login({ onSignInSuccess }) {
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ email: '', password: '', loginType: 'resident' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,18 +16,19 @@ function Login({ onSignInSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const normalizedEmail = form.email.trim().toLowerCase();
 
     // New: Prevent empty values
-    if (!form.email.trim() || !form.password.trim()) {
+    if (!normalizedEmail || !form.password.trim()) {
       setError('Email and password cannot be empty.');
       return;
     }
 
-    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
-    const passwordValid = form.password.length >= 8;
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+    const passwordValid = form.password.length >= 6;
 
     if (!emailValid || !passwordValid) {
-      setError('Enter a valid email and a password with at least 8 characters.');
+      setError('Enter a valid email and a password with at least 6 characters.');
       return;
     }
 
@@ -40,7 +41,7 @@ function Login({ onSignInSuccess }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: form.email, password: form.password }),
+        body: JSON.stringify({ email: normalizedEmail, password: form.password, loginType: form.loginType }),
         credentials: 'include', // Ensure cookies are sent
       });
       let data = {};
@@ -52,9 +53,12 @@ function Login({ onSignInSuccess }) {
         return;
       }
       if (response.ok && data.success) {
-        localStorage.setItem('user', JSON.stringify({ email: form.email }));
+        localStorage.setItem('user', JSON.stringify({ email: normalizedEmail, role: data?.user?.role || '' }));
         onSignInSuccess();
       } else {
+        if (response.status === 403 && data?.suggestedLoginType) {
+          setForm((prev) => ({ ...prev, loginType: data.suggestedLoginType }));
+        }
         setError(data.message || 'Invalid email or password.');
       }
     } catch (err) {
@@ -85,6 +89,33 @@ function Login({ onSignInSuccess }) {
         </div>
 
         <form className="login-form" onSubmit={handleSubmit} noValidate>
+          <div className="input-group">
+            <label className="input-label" htmlFor="loginType">Login as</label>
+            <div className="role-switch" role="radiogroup" aria-label="Login role">
+              <button
+                type="button"
+                className={`role-option ${form.loginType === 'reception' ? 'active' : ''}`}
+                onClick={() => setForm((prev) => ({ ...prev, loginType: 'reception' }))}
+              >
+                Reception Desk
+              </button>
+              <button
+                type="button"
+                className={`role-option ${form.loginType === 'resident' ? 'active' : ''}`}
+                onClick={() => setForm((prev) => ({ ...prev, loginType: 'resident' }))}
+              >
+                Resident
+              </button>
+              <button
+                type="button"
+                className={`role-option ${form.loginType === 'committee' ? 'active' : ''}`}
+                onClick={() => setForm((prev) => ({ ...prev, loginType: 'committee' }))}
+              >
+                Committee Head
+              </button>
+            </div>
+          </div>
+
           <div className="input-group">
             <label className="input-label" htmlFor="email">Email address</label>
             <div className="input-wrapper">

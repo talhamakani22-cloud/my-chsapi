@@ -1,0 +1,178 @@
+.filters-section {
+  margin-bottom: 20px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.date-picker-group,
+.month-group,
+.search-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-picker-group label,
+.month-group label,
+.search-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #223645;
+}
+
+.date-input,
+.month-select,
+.search-input {
+  padding: 11px 12px;
+  border: 1px solid #d3dfeb;
+  border-radius: 10px;
+  background: #f8fbff;
+  color: #132635;
+  font-size: 14px;
+}
+
+.search-group {
+  min-width: 320px;
+  flex: 1;
+}
+
+.search-input-wrapper {
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.search-input {
+  width: 100%;
+  padding-left: 32px;
+}
+
+.clear-btn,
+.search-btn,
+.refresh-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clear-btn {
+  background: #f3f6fa;
+  color: #1c3448;
+  border: 1px solid #d9e4ee;
+}
+
+.search-btn {
+  background: linear-gradient(135deg, #58aee6 0%, #9fd7f5 100%);
+  color: #fff;
+}
+
+.refresh-btn {
+  background: #eff6fc;
+  color: #1c3448;
+  border: 1px solid #d9e4ee;
+}
+
+.results-count {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #223645;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.visitors-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.visitors-report-table thead {
+  background: #f2f7fc;
+}
+
+.visitors-report-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 700;
+  border-bottom: 1px solid #d9e4ee;
+  color: #1d3448;
+}
+
+.visitors-report-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e4edf5;
+  color: #1c2f40;
+}
+
+.visitors-report-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.name-en-cell,
+.emirates-id-cell {
+  font-weight: 600;
+}
+
+.nationality-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e8f4ff;
+  color: #0c5a88;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.file-link {
+  color: #0369a1;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.file-link:hover {
+  text-decoration: underline;
+}
+
+.no-results {
+  text-align: center;
+  color: #475569;
+  padding: 18px;
+}
+
+.print-btn {
+  background: #f3f6fa;
+  color: #1c3448;
+  border: 1px solid #d9e4ee;
+}
+
+.print-btn:hover {
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .search-group {
+    min-width: 100%;
+  }
+}

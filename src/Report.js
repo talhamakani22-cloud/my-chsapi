@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import './Report.css';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
 
 function Report({ onBackToDashboard, onRequireLogin }) {
   const now = new Date();
@@ -117,7 +119,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
     return '-';
   };
 
-  const fetchVisitors = async () => {
+  const fetchVisitors = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -125,7 +127,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
       if (searchQuery) params.append('search', searchQuery);
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
-      const res = await fetch(`http://localhost:1001/api/visitors?${params.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/api/visitors?${params.toString()}`, { credentials: 'include' });
       const data = await res.json();
       if (data.success) {
         setVisitors(data.visitors);
@@ -136,7 +138,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
       setError('Failed to fetch visitors');
     }
     setLoading(false);
-  };
+  }, [searchQuery, startDate, endDate]);
 
   const getMonthKey = (visitor) => {
     // Group by registration/entry time first so monthly report reflects actual visit month.
@@ -162,11 +164,17 @@ function Report({ onBackToDashboard, onRequireLogin }) {
     return visitors.filter((visitor) => getMonthKey(visitor) === selectedMonth);
   }, [visitors, selectedMonth]);
 
-  // Fetch all visitors on mount
   useEffect(() => {
     fetchVisitors();
-    // eslint-disable-next-line
-  }, []);
+
+    const intervalId = setInterval(() => {
+      fetchVisitors();
+    }, 30000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [fetchVisitors]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -187,6 +195,89 @@ function Report({ onBackToDashboard, onRequireLogin }) {
     setError('');
     // Fetch all visitors after clearing filters
     fetchVisitors();
+  };
+
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+    if (!printWindow) return;
+
+    const rowsHtml = filteredVisitors.length
+      ? filteredVisitors
+          .map(
+            (visitor) => `
+              <tr>
+                <td>${visitor.emiratesId || '-'}</td>
+                <td>${visitor.fullNameEnglish || '-'}</td>
+                <td>${visitor.fatherName || '-'}</td>
+                <td>${visitor.countryOfStay || visitor.nationality || '-'}</td>
+                <td>${visitor.houseNumber || '-'}</td>
+                <td>${formatEntryTime(visitor)}</td>
+                <td>${visitor.dateOfBirth || '-'}</td>
+                <td>${visitor.gender || '-'}</td>
+                <td>${visitor.expiryDate || '-'}</td>
+                <td>${visitor.issueDate || '-'}</td>
+                <td>${visitor.purposeOfVisit || '-'}</td>
+                <td>${formatVisitorStatus(visitor)}</td>
+              </tr>
+            `
+          )
+          .join('')
+      : '<tr><td colspan="12" style="text-align:center; padding:16px;">No records found</td></tr>';
+
+    const printedAt = new Date().toLocaleString();
+    const monthText = selectedMonth ? formatMonthLabel(selectedMonth) : 'All Months';
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Visitor Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+            h1 { margin: 0 0 8px 0; font-size: 22px; }
+            .meta { margin-bottom: 16px; font-size: 13px; color: #444; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f2f7fb; }
+            @media print {
+              body { margin: 8mm; }
+              .meta { color: #000; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Pakistan ID Visitor Report</h1>
+          <div class="meta">Printed: ${printedAt}</div>
+          <div class="meta">Month: ${monthText} | Records: ${filteredVisitors.length}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Identity Number</th>
+                <th>Name</th>
+                <th>Father Name</th>
+                <th>Country of Stay</th>
+                <th>House Number</th>
+                <th>Entry Time</th>
+                <th>Date of Birth</th>
+                <th>Gender</th>
+                <th>Expiry Date</th>
+                <th>Issue Date</th>
+                <th>Purpose of Visit</th>
+                <th>Visitor Status</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <script>
+            window.onload = function () {
+              window.print();
+              window.onafterprint = function () { window.close(); };
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   return (
@@ -338,7 +429,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
         <button className="action-btn export-btn">
           📥 Export to CSV
         </button>
-        <button className="action-btn print-btn">
+        <button className="action-btn print-btn" onClick={handlePrintReport}>
           🖨️ Print Report
         </button>
         <button className="action-btn back-dashboard" onClick={onBackToDashboard}>

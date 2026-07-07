@@ -28,9 +28,18 @@ app.use(session({
 const authRouter = require('./api/auth');
 const visitorsRouter = require('./api/visitors');
 const sessionRouter = require('./api/session');
+const familyRouter = require('./api/family');
+const ocrRouter = require('./api/ocr');
+const vehicleRouter = require('./api/vehicle');
+const maintenanceRouter = require('./api/maintenance');
 app.use('/api/auth', authRouter);
 app.use('/api/auth', sessionRouter);
 app.use('/api/visitors', visitorsRouter);
+app.use('/api/family', familyRouter);
+app.use('/api/ocr', ocrRouter);
+app.use('/api/vehicle', vehicleRouter);
+app.use('/api/maintenance', maintenanceRouter);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Protected route
 
