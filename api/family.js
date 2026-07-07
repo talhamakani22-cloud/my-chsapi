@@ -148,6 +148,40 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  try {
+    const access = getAccessScope(req);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const recordId = String(req.params.id || '').trim();
+    if (!recordId || !mongoose.Types.ObjectId.isValid(recordId)) {
+      return res.status(400).json({ success: false, message: 'Invalid record id.' });
+    }
+
+    const selector = { _id: new mongoose.Types.ObjectId(recordId) };
+    if (access.scope === 'resident') {
+      selector.flatNumber = { $regex: buildFlatScopedRegex(access.flatNumber) };
+    }
+
+    const result = await db.collection(FAMILY_COLLECTION).deleteOne(selector);
+
+    if (!result.deletedCount) {
+      return res.status(404).json({ success: false, message: 'Family record not found.' });
+    }
+
+    return res.json({ success: true, message: 'Family details deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to delete family record.' });
+  }
+});
+
 router.post('/upload-cnic-pdf', upload.single('cnicPdf'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'No CNIC PDF uploaded.' });

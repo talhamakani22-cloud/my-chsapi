@@ -185,6 +185,18 @@
   cursor: pointer;
 }
 
+.family-delete-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+  cursor: pointer;
+  margin-left: 8px;
+}
+
 .family-edit-overlay {
   position: fixed;
   inset: 0;

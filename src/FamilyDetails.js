@@ -136,6 +136,33 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
     setSavingEdit(false);
   };
 
+  const handleDeleteRecord = async (record) => {
+    if (!record?._id) return;
+
+    const confirmed = window.confirm(`Delete family record for ${record.residentName || 'this resident'}?`);
+    if (!confirmed) return;
+
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/family/${record._id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to delete family details.');
+      }
+      if (editingRecord?._id === record._id) {
+        closeEditModal();
+      }
+      fetchFamilyRecords();
+    } catch (err) {
+      setError(err.message || 'Failed to delete family details.');
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="family-report-container">
       <div className="bg-shapes">
@@ -216,6 +243,9 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
                       <td>
                         <button className="family-edit-btn" onClick={() => openEditModal(record)}>
                           Edit
+                        </button>
+                        <button className="family-delete-btn" onClick={() => handleDeleteRecord(record)}>
+                          Delete
                         </button>
                       </td>
                     </tr>
