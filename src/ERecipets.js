@@ -9,6 +9,19 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [scope, setScope] = useState('resident');
+  const [editingId, setEditingId] = useState('');
+  const [editForm, setEditForm] = useState({
+    ownerName: '',
+    residentName: '',
+    flatNumber: '',
+    receiptMonth: '',
+    amount: '',
+    status: '',
+    paymentDate: '',
+    note: '',
+  });
+  const [savingAction, setSavingAction] = useState(false);
 
   useEffect(() => {
     const user = localStorage.getItem('user');
@@ -26,7 +39,20 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Failed to fetch e-recipets.');
       }
-      setRows(Array.isArray(data.rows) ? data.rows : []);
+      setScope(data.scope || 'resident');
+      const normalizedRows = (Array.isArray(data.rows) ? data.rows : []).map((row) => {
+        const amount = Number(row.amount || 0);
+        const status = String(row.status || '').toLowerCase();
+        const isPaid = status === 'paid';
+
+        return {
+          ...row,
+          amount,
+          receivedAmount: isPaid ? amount : 0,
+          pendingAmount: isPaid ? 0 : amount,
+        };
+      });
+      setRows(normalizedRows);
     } catch (err) {
       setRows([]);
       setError(err.message || 'Failed to fetch e-recipets.');
@@ -41,6 +67,109 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
     return () => clearInterval(intervalId);
   }, []);
 
+  const startEditRow = (row) => {
+    setEditingId(String(row.id || ''));
+    setEditForm({
+      ownerName: row.ownerName || '',
+      residentName: row.residentName || '',
+      flatNumber: row.flatNumber || '',
+      receiptMonth: row.receiptMonth || '',
+      amount: String(row.amount ?? ''),
+      status: row.status || '',
+      paymentDate: row.paymentDate === '-' ? '' : (row.paymentDate || ''),
+      note: row.note === '-' ? '' : (row.note || ''),
+    });
+  };
+
+  const cancelEditRow = () => {
+    setEditingId('');
+    setEditForm({
+      ownerName: '',
+      residentName: '',
+      flatNumber: '',
+      receiptMonth: '',
+      amount: '',
+      status: '',
+      paymentDate: '',
+      note: '',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId || savingAction) return;
+
+    const amount = Number(editForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Amount must be a positive number.');
+      return;
+    }
+
+    try {
+      setSavingAction(true);
+      setError('');
+      const res = await fetch(`${API_BASE_URL}/api/maintenance/${editingId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerName: editForm.ownerName,
+          residentName: editForm.residentName,
+          flatNumber: editForm.flatNumber,
+          receiptMonth: editForm.receiptMonth,
+          amount,
+          status: editForm.status,
+          paymentDate: editForm.paymentDate,
+          note: editForm.note,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to update receipt.');
+      }
+
+      cancelEditRow();
+      fetchReceipts();
+    } catch (err) {
+      setError(err.message || 'Failed to update receipt.');
+    } finally {
+      setSavingAction(false);
+    }
+  };
+
+  const handleDeleteRow = async (row) => {
+    const receiptId = String(row.id || '');
+    if (!receiptId || savingAction) return;
+
+    const confirmed = window.confirm(`Delete receipt ${row.receiptNo || ''}?`);
+    if (!confirmed) return;
+
+    try {
+      setSavingAction(true);
+      setError('');
+      const res = await fetch(`${API_BASE_URL}/api/maintenance/${receiptId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to delete receipt.');
+      }
+
+      if (editingId === receiptId) {
+        cancelEditRow();
+      }
+      fetchReceipts();
+    } catch (err) {
+      setError(err.message || 'Failed to delete receipt.');
+    } finally {
+      setSavingAction(false);
+    }
+  };
+
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return rows;
@@ -48,6 +177,7 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
     return rows.filter((row) =>
       [
         row.receiptNo,
+        row.ownerName,
         row.residentName,
         row.flatNumber,
         row.receiptMonth,
@@ -60,17 +190,39 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
     );
   }, [rows, searchQuery]);
 
-  const totals = useMemo(() => {
-    return filteredRows.reduce(
-      (acc, row) => {
-        acc.amount += Number(row.amount || 0);
-        acc.received += Number(row.receivedAmount || 0);
-        acc.pending += Number(row.pendingAmount || 0);
-        return acc;
-      },
-      { amount: 0, received: 0, pending: 0 }
+  const perFlatAmount = useMemo(() => {
+    if (!filteredRows.length) return 0;
+
+    const amounts = Array.from(
+      new Set(filteredRows.map((row) => Number(row.amount || 0).toFixed(2)))
     );
+
+    if (amounts.length === 1) {
+      return Number(amounts[0]);
+    }
+
+    return null;
   }, [filteredRows]);
+
+  const summaryAmounts = useMemo(() => {
+    if (!filteredRows.length) {
+      return { received: 0, pending: 0 };
+    }
+
+    const receivedSet = Array.from(
+      new Set(filteredRows.map((row) => Number(row.receivedAmount || 0).toFixed(2)))
+    );
+    const pendingSet = Array.from(
+      new Set(filteredRows.map((row) => Number(row.pendingAmount || 0).toFixed(2)))
+    );
+
+    return {
+      received: receivedSet.length === 1 ? Number(receivedSet[0]) : null,
+      pending: pendingSet.length === 1 ? Number(pendingSet[0]) : null,
+    };
+  }, [filteredRows]);
+
+  const canManageRows = scope === 'all';
 
   return (
     <div className="report-container">
@@ -118,16 +270,16 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
 
         <div className="erecipets-summary-row">
           <div className="erecipets-summary-card">
-            <span className="label">Total Amount</span>
-            <strong>PKR {totals.amount.toFixed(2)}</strong>
+            <span className="label">Per Flat Amount</span>
+            <strong>{perFlatAmount === null ? 'Mixed' : `PKR ${perFlatAmount.toFixed(2)}`}</strong>
           </div>
           <div className="erecipets-summary-card">
             <span className="label">Received Amount</span>
-            <strong>PKR {totals.received.toFixed(2)}</strong>
+            <strong>{summaryAmounts.received === null ? 'Mixed' : `PKR ${summaryAmounts.received.toFixed(2)}`}</strong>
           </div>
           <div className="erecipets-summary-card">
             <span className="label">Pending Amount</span>
-            <strong>PKR {totals.pending.toFixed(2)}</strong>
+            <strong>{summaryAmounts.pending === null ? 'Mixed' : `PKR ${summaryAmounts.pending.toFixed(2)}`}</strong>
           </div>
         </div>
 
@@ -136,6 +288,7 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
             <thead>
               <tr>
                 <th>Receipt No</th>
+                <th>Owner Name</th>
                 <th>Resident Name</th>
                 <th>Flat Number</th>
                 <th>Receipt Month</th>
@@ -145,6 +298,7 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
                 <th>Note</th>
                 <th>Received Amount</th>
                 <th>Pending Amount</th>
+                {canManageRows && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -152,24 +306,86 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
                 filteredRows.map((row) => (
                   <tr key={String(row.id || row.receiptNo)}>
                     <td className="emirates-id-cell">{row.receiptNo || '-'}</td>
-                    <td className="name-en-cell">{row.residentName || '-'}</td>
-                    <td>{row.flatNumber || '-'}</td>
-                    <td>{row.receiptMonth || '-'}</td>
-                    <td>PKR {Number(row.amount || 0).toFixed(2)}</td>
-                    <td>
-                      <span className={`erecipet-status ${String(row.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
-                        {row.status || '-'}
-                      </span>
+                    <td className="name-en-cell">
+                      {editingId === String(row.id || '') ? (
+                        <input className="erecipets-inline-input" value={editForm.ownerName} onChange={(e) => setEditForm((prev) => ({ ...prev, ownerName: e.target.value }))} />
+                      ) : (
+                        row.ownerName || '-'
+                      )}
                     </td>
-                    <td>{row.paymentDate || '-'}</td>
-                    <td>{row.note || '-'}</td>
+                    <td className="name-en-cell">
+                      {editingId === String(row.id || '') ? (
+                        <input className="erecipets-inline-input" value={editForm.residentName} onChange={(e) => setEditForm((prev) => ({ ...prev, residentName: e.target.value }))} />
+                      ) : (
+                        row.residentName || '-'
+                      )}
+                    </td>
+                    <td>
+                      {editingId === String(row.id || '') ? (
+                        <input className="erecipets-inline-input" value={editForm.flatNumber} onChange={(e) => setEditForm((prev) => ({ ...prev, flatNumber: e.target.value }))} />
+                      ) : (
+                        row.flatNumber || '-'
+                      )}
+                    </td>
+                    <td>
+                      {editingId === String(row.id || '') ? (
+                        <input className="erecipets-inline-input" value={editForm.receiptMonth} onChange={(e) => setEditForm((prev) => ({ ...prev, receiptMonth: e.target.value }))} />
+                      ) : (
+                        row.receiptMonth || '-'
+                      )}
+                    </td>
+                    <td>
+                      {editingId === String(row.id || '') ? (
+                        <input className="erecipets-inline-input" value={editForm.amount} onChange={(e) => setEditForm((prev) => ({ ...prev, amount: e.target.value }))} />
+                      ) : (
+                        `PKR ${Number(row.amount || 0).toFixed(2)}`
+                      )}
+                    </td>
+                    <td>
+                      {editingId === String(row.id || '') ? (
+                        <input className="erecipets-inline-input" value={editForm.status} onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value }))} />
+                      ) : (
+                        <span className={`erecipet-status ${String(row.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
+                          {row.status || '-'}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {editingId === String(row.id || '') ? (
+                        <input className="erecipets-inline-input" value={editForm.paymentDate} onChange={(e) => setEditForm((prev) => ({ ...prev, paymentDate: e.target.value }))} />
+                      ) : (
+                        row.paymentDate || '-'
+                      )}
+                    </td>
+                    <td>
+                      {editingId === String(row.id || '') ? (
+                        <input className="erecipets-inline-input" value={editForm.note} onChange={(e) => setEditForm((prev) => ({ ...prev, note: e.target.value }))} />
+                      ) : (
+                        row.note || '-'
+                      )}
+                    </td>
                     <td>PKR {Number(row.receivedAmount || 0).toFixed(2)}</td>
                     <td>PKR {Number(row.pendingAmount || 0).toFixed(2)}</td>
+                    {canManageRows && (
+                      <td>
+                        {editingId === String(row.id || '') ? (
+                          <div className="erecipets-action-group">
+                            <button className="erecipets-action-btn save" onClick={handleSaveEdit} disabled={savingAction}>Save</button>
+                            <button className="erecipets-action-btn cancel" onClick={cancelEditRow} disabled={savingAction}>Cancel</button>
+                          </div>
+                        ) : (
+                          <div className="erecipets-action-group">
+                            <button className="erecipets-action-btn edit" onClick={() => startEditRow(row)} disabled={savingAction}>Edit</button>
+                            <button className="erecipets-action-btn delete" onClick={() => handleDeleteRow(row)} disabled={savingAction}>Delete</button>
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="10" className="no-results">
+                  <td colSpan={canManageRows ? '12' : '11'} className="no-results">
                     No e-recipets found
                   </td>
                 </tr>

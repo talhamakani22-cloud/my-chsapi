@@ -9,6 +9,40 @@ const router = express.Router();
 const RECEIPTS_COLLECTION = 'maintenance_receipts';
 const INBOX_COLLECTION = 'maintenance_inbox';
 const E_RECIPTS_COLLECTION = 'e reciept';
+const FAMILY_COLLECTION = 'family_detail';
+
+function extractFlatNumberFromEmail(email = '') {
+  const normalized = String(email || '').trim().toLowerCase();
+  const match = normalized.match(/^[a-z]+(?:[._-]?[a-z]+)*(\d+)@chs\.com$/i);
+  return match ? match[1] : '';
+}
+
+function normalizeFlatNumber(flatNumber = '') {
+  const value = String(flatNumber || '').trim();
+  if (!value) return '';
+  const digitOnly = value.match(/\d+/g);
+  if (digitOnly && digitOnly.length) {
+    return digitOnly.join('');
+  }
+  return value.toLowerCase();
+}
+
+function buildReceiptNo(flatNumber = '', index = 0) {
+  const safeFlat = normalizeFlatNumber(flatNumber) || 'NA';
+  const suffix = index > 0 ? `-${index}` : '';
+  return `MR-${safeFlat}-${Date.now()}${suffix}`;
+}
+
+async function getRecipientsByFlat(flatNumber = '') {
+  const users = await User.find({ role: 'user', isActive: { $ne: false } })
+    .select('_id email name role')
+    .lean();
+
+  const targetFlat = normalizeFlatNumber(flatNumber);
+  if (!targetFlat) return [];
+
+  return users.filter((user) => normalizeFlatNumber(extractFlatNumberFromEmail(user.email)) === targetFlat);
+}
 
 async function ensureCollectionExists(db, collectionName) {
   const collections = await db.listCollections({ name: collectionName }).toArray();
@@ -21,6 +55,12 @@ function canViewAllMaintenance(sessionUser) {
   const role = String(sessionUser?.role || '').toLowerCase();
   const loginType = String(sessionUser?.loginType || '').toLowerCase();
   return role === 'admin' || role === 'manager' || loginType === 'committee' || loginType === 'reception';
+}
+
+function canManageMaintenance(sessionUser) {
+  const role = String(sessionUser?.role || '').toLowerCase();
+  const loginType = String(sessionUser?.loginType || '').toLowerCase();
+  return role === 'admin' || role === 'manager' || loginType === 'committee';
 }
 
 const slipsUploadDir = path.join(__dirname, '..', 'uploads', 'maintenance-slips');
@@ -105,10 +145,13 @@ router.get('/report', async (req, res) => {
         const paidUsers = Number(stats.paidUsers || 0);
         const pendingUsers = Math.max(totalUsers - paidUsers, 0);
         const amount = Number(receipt.amount || 0);
+        const receiptStatus = String(receipt.status || '').toLowerCase();
+        const isPaid = receiptStatus === 'paid';
 
         return {
           id: receipt._id,
           receiptNo: receipt.receiptNo || '-',
+          ownerName: receipt.ownerName || receipt.residentName || '-',
           residentName: receipt.residentName || '-',
           flatNumber: receipt.flatNumber || '-',
           receiptMonth: receipt.receiptMonth || '-',
@@ -119,8 +162,8 @@ router.get('/report', async (req, res) => {
           recipientsCount: totalUsers,
           receivedUsers: paidUsers,
           pendingUsers,
-          receivedAmount: amount * paidUsers,
-          pendingAmount: amount * pendingUsers,
+          receivedAmount: isPaid ? amount : 0,
+          pendingAmount: isPaid ? 0 : amount,
           generatedAt: receipt.generatedAt || receipt.createdAt || null,
         };
       });
@@ -153,6 +196,7 @@ router.get('/report', async (req, res) => {
       return {
         id: row.receiptId,
         receiptNo: receipt?.receiptNo || '-',
+        ownerName: receipt?.ownerName || receipt?.residentName || '-',
         residentName: receipt?.residentName || '-',
         flatNumber: receipt?.flatNumber || '-',
         receiptMonth: receipt?.receiptMonth || '-',
@@ -181,6 +225,7 @@ router.get('/report', async (req, res) => {
 router.post('/broadcast', async (req, res) => {
   const {
     receiptNo,
+    ownerName,
     residentName,
     flatNumber,
     receiptMonth,
@@ -213,12 +258,12 @@ router.post('/broadcast', async (req, res) => {
 
     await ensureCollectionExists(db, E_RECIPTS_COLLECTION);
 
-    const recipients = await User.find({ role: 'user', isActive: { $ne: false } })
-      .select('_id email name role')
-      .lean();
+    const recipients = await getRecipientsByFlat(flatNumber);
+    const ownerLabel = String(ownerName || residentName || '').trim();
 
     const payload = {
-      receiptNo: String(receiptNo || `MR-${Date.now()}`),
+      receiptNo: String(receiptNo || buildReceiptNo(flatNumber)),
+      ownerName: ownerLabel,
       residentName: String(residentName || '').trim(),
       flatNumber: String(flatNumber || '').trim(),
       receiptMonth: String(receiptMonth || '').trim(),
@@ -252,7 +297,7 @@ router.post('/broadcast', async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Receipt sent to ${recipients.length} users.`,
+      message: `Receipt generated for flat ${payload.flatNumber} and sent to ${recipients.length} matched resident account(s).`,
       receiptId: insertedReceipt.insertedId,
       recipientsCount: recipients.length,
     });
@@ -261,6 +306,240 @@ router.post('/broadcast', async (req, res) => {
       success: false,
       message: err.message || 'Failed to broadcast maintenance receipt.',
     });
+  }
+});
+
+router.post('/broadcast-bulk', async (req, res) => {
+  const {
+    receiptMonth,
+    amount,
+    status,
+    paymentDate,
+    note,
+    generatedAt,
+  } = req.body || {};
+
+  if (String(receiptMonth || '').trim() === '' || String(amount || '').trim() === '') {
+    return res.status(400).json({
+      success: false,
+      message: 'receiptMonth and amount are required.',
+    });
+  }
+
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    return res.status(400).json({ success: false, message: 'Amount must be a positive number.' });
+  }
+
+  try {
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const familyRows = await db
+      .collection(FAMILY_COLLECTION)
+      .find({
+        residentName: { $exists: true, $ne: '' },
+        flatNumber: { $exists: true, $ne: '' },
+      })
+      .sort({ uploadedAt: -1, _id: -1 })
+      .toArray();
+
+    const uniqueFamilies = [];
+    const seenFlats = new Set();
+    for (const row of familyRows) {
+      const normalizedFlat = normalizeFlatNumber(row.flatNumber);
+      if (!normalizedFlat || seenFlats.has(normalizedFlat)) continue;
+      seenFlats.add(normalizedFlat);
+      uniqueFamilies.push(row);
+    }
+
+    if (!uniqueFamilies.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'No family records found with resident name and flat number.',
+      });
+    }
+
+    const receiptDocs = [];
+    const inboxDocs = [];
+    let totalRecipients = 0;
+
+    for (let i = 0; i < uniqueFamilies.length; i += 1) {
+      const family = uniqueFamilies[i];
+      const resident = String(family.residentName || '').trim();
+      const flat = String(family.flatNumber || '').trim();
+      if (!resident || !flat) continue;
+
+      const recipients = await getRecipientsByFlat(flat);
+      totalRecipients += recipients.length;
+
+      const receiptId = new mongoose.Types.ObjectId();
+      const now = new Date();
+      const receiptDoc = {
+        _id: receiptId,
+        receiptNo: buildReceiptNo(flat, i + 1),
+        ownerName: resident,
+        residentName: resident,
+        flatNumber: flat,
+        receiptMonth: String(receiptMonth || '').trim(),
+        amount: numericAmount,
+        status: String(status || 'Unpaid').trim(),
+        paymentDate: String(paymentDate || '').trim(),
+        note: String(note || '').trim(),
+        generatedAt: generatedAt ? new Date(generatedAt) : now,
+        receiptPdfUri: '',
+        recipientsCount: recipients.length,
+        createdBy: req?.session?.user?.email || 'system',
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      receiptDocs.push(receiptDoc);
+
+      for (const user of recipients) {
+        inboxDocs.push({
+          receiptId,
+          userId: user._id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          status: 'unread',
+          createdAt: now,
+        });
+      }
+    }
+
+    if (!receiptDocs.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'No valid family records found for receipt generation.',
+      });
+    }
+
+    await db.collection(RECEIPTS_COLLECTION).insertMany(receiptDocs);
+    if (inboxDocs.length) {
+      await db.collection(INBOX_COLLECTION).insertMany(inboxDocs);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: `Generated ${receiptDocs.length} e-receipt(s) for flat owners. Sent to ${totalRecipients} matched resident account(s).`,
+      generatedCount: receiptDocs.length,
+      recipientsCount: totalRecipients,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Failed to generate maintenance e-receipts.',
+    });
+  }
+});
+
+router.put('/:id', async (req, res) => {
+  const sessionUser = req?.session?.user;
+  if (!sessionUser?.email) {
+    return res.status(401).json({ success: false, message: 'Please log in first.' });
+  }
+
+  if (!canManageMaintenance(sessionUser)) {
+    return res.status(403).json({ success: false, message: 'You are not authorized to edit receipts.' });
+  }
+
+  const receiptIdRaw = String(req.params.id || '').trim();
+  if (!mongoose.Types.ObjectId.isValid(receiptIdRaw)) {
+    return res.status(400).json({ success: false, message: 'Invalid receipt id.' });
+  }
+
+  const updates = {};
+
+  const ownerName = String(req.body.ownerName || '').trim();
+  const residentName = String(req.body.residentName || '').trim();
+  const flatNumber = String(req.body.flatNumber || '').trim();
+  const receiptMonth = String(req.body.receiptMonth || '').trim();
+  const status = String(req.body.status || '').trim();
+  const paymentDate = String(req.body.paymentDate || '').trim();
+  const note = String(req.body.note || '').trim();
+
+  if (ownerName) updates.ownerName = ownerName;
+  if (residentName) updates.residentName = residentName;
+  if (flatNumber) updates.flatNumber = flatNumber;
+  if (receiptMonth) updates.receiptMonth = receiptMonth;
+  if (status) updates.status = status;
+  updates.paymentDate = paymentDate;
+  updates.note = note;
+
+  if (req.body.amount !== undefined) {
+    const numericAmount = Number(req.body.amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Amount must be a positive number.' });
+    }
+    updates.amount = numericAmount;
+  }
+
+  if (!Object.keys(updates).length) {
+    return res.status(400).json({ success: false, message: 'No valid fields provided to update.' });
+  }
+
+  updates.updatedAt = new Date();
+
+  try {
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const receiptId = new mongoose.Types.ObjectId(receiptIdRaw);
+    const result = await db.collection(RECEIPTS_COLLECTION).updateOne(
+      { _id: receiptId },
+      { $set: updates }
+    );
+
+    if (!result.matchedCount) {
+      return res.status(404).json({ success: false, message: 'Receipt not found.' });
+    }
+
+    return res.json({ success: true, message: 'Receipt updated successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to update receipt.' });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  const sessionUser = req?.session?.user;
+  if (!sessionUser?.email) {
+    return res.status(401).json({ success: false, message: 'Please log in first.' });
+  }
+
+  if (!canManageMaintenance(sessionUser)) {
+    return res.status(403).json({ success: false, message: 'You are not authorized to delete receipts.' });
+  }
+
+  const receiptIdRaw = String(req.params.id || '').trim();
+  if (!mongoose.Types.ObjectId.isValid(receiptIdRaw)) {
+    return res.status(400).json({ success: false, message: 'Invalid receipt id.' });
+  }
+
+  try {
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const receiptId = new mongoose.Types.ObjectId(receiptIdRaw);
+    const deleteResult = await db.collection(RECEIPTS_COLLECTION).deleteOne({ _id: receiptId });
+
+    if (!deleteResult.deletedCount) {
+      return res.status(404).json({ success: false, message: 'Receipt not found.' });
+    }
+
+    await db.collection(INBOX_COLLECTION).deleteMany({ receiptId });
+    await db.collection(E_RECIPTS_COLLECTION).deleteMany({ receiptId });
+
+    return res.json({ success: true, message: 'Receipt deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to delete receipt.' });
   }
 });
 
