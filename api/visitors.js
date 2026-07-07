@@ -2,6 +2,9 @@
 const { connectDB } = require('../config/database');
 const Visitor = require('../models/Visitor');
 const { getAccessScope, buildFlatScopedRegex } = require('./accessScope');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 const express = require('express');
 const router = express.Router();
@@ -66,8 +69,31 @@ router.get('/', async (req, res) => {
 // Pakistani CNIC format: 12345-1234567-1
 const cnicPattern = /^[0-9]{5}-[0-9]{7}-[0-9]{1}$/;
 
+const uploadDir = path.join(__dirname, '..', 'uploads', 'cnic-scans');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const safeBase = `cnic-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname || '').toLowerCase() || '.pdf';
+    cb(null, `${safeBase}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (allowed.includes(file.mimetype)) return cb(null, true);
+    return cb(new Error('Only PDF or image files are allowed for CNIC scans.'));
+  },
+});
+
 // POST /api/visitors - Add a new visitor
-router.post('/', async (req, res) => {
+router.post('/', upload.single('cnicPdf'), async (req, res) => {
   const {
     emiratesId,
     fullNameEnglish,
@@ -82,7 +108,8 @@ router.post('/', async (req, res) => {
     issueDate,
     expiryDate,
     purposeOfVisit,
-    remark
+    remark,
+    platform
   } = req.body;
 
   const normalizedGender = normalizeGender(gender);
@@ -98,6 +125,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    const scannedImageUri = req.file ? `/uploads/cnic-scans/${req.file.filename}` : null;
     const visitor = new Visitor({
       emiratesId,
       fullNameEnglish,
@@ -112,7 +140,9 @@ router.post('/', async (req, res) => {
       issueDate,
       expiryDate,
       purposeOfVisit,
-      remark
+      remark,
+      scannedImageUri,
+      platform: platform || 'expo'
     });
     await visitor.save();
     console.log('[Visitor Added]', {

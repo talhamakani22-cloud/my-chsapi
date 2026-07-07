@@ -3,6 +3,18 @@ import './Report.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
 
+const buildFileUrl = (value) => {
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${API_BASE_URL}${value}`;
+};
+
+const getFileNameFromPath = (value) => {
+  if (!value) return '';
+  const normalized = value.split('/').filter(Boolean).pop();
+  return normalized || value;
+};
+
 function Report({ onBackToDashboard, onRequireLogin }) {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -217,12 +229,13 @@ function Report({ onBackToDashboard, onRequireLogin }) {
                 <td>${visitor.expiryDate || '-'}</td>
                 <td>${visitor.issueDate || '-'}</td>
                 <td>${visitor.purposeOfVisit || '-'}</td>
+                <td>${visitor.scannedImageUri ? getFileNameFromPath(visitor.scannedImageUri) : '-'}</td>
                 <td>${formatVisitorStatus(visitor)}</td>
               </tr>
             `
           )
           .join('')
-      : '<tr><td colspan="12" style="text-align:center; padding:16px;">No records found</td></tr>';
+      : '<tr><td colspan="13" style="text-align:center; padding:16px;">No records found</td></tr>';
 
     const printedAt = new Date().toLocaleString();
     const monthText = selectedMonth ? formatMonthLabel(selectedMonth) : 'All Months';
@@ -263,6 +276,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
                 <th>Expiry Date</th>
                 <th>Issue Date</th>
                 <th>Purpose of Visit</th>
+                <th>CNIC Scan</th>
                 <th>Visitor Status</th>
               </tr>
             </thead>
@@ -388,6 +402,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
                 <th>Expiry Date</th>
                 <th>Issue Date</th>
                 <th>Purpose of Visit</th>
+                <th>CNIC Scan</th>
                 <th>Visitor Status</th>
               </tr>
             </thead>
@@ -410,12 +425,26 @@ function Report({ onBackToDashboard, onRequireLogin }) {
                     <td>{visitor.expiryDate}</td>
                     <td>{visitor.issueDate}</td>
                     <td>{visitor.purposeOfVisit || '-'}</td>
+                    <td>
+                      {visitor.scannedImageUri ? (
+                        <a
+                          href={buildFileUrl(visitor.scannedImageUri)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="cnic-scan-link"
+                        >
+                          View PDF
+                        </a>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
                     <td>{formatVisitorStatus(visitor)}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="12" className="no-results">
+                  <td colSpan="13" className="no-results">
                     No records found matching your criteria
                   </td>
                 </tr>

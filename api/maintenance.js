@@ -71,11 +71,13 @@ if (!fs.existsSync(slipsUploadDir)) {
 const slipStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, slipsUploadDir),
   filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const safeExt = ['.pdf', '.jpg', '.jpeg'].includes(ext) ? ext : '.pdf';
     const safeBase = path
       .basename(file.originalname || 'maintenance-slip.pdf', path.extname(file.originalname || '.pdf'))
       .replace(/[^a-zA-Z0-9_-]/g, '_')
       .slice(0, 60);
-    cb(null, `${Date.now()}-${safeBase || 'maintenance-slip'}.pdf`);
+    cb(null, `${Date.now()}-${safeBase || 'maintenance-slip'}${safeExt}`);
   },
 });
 
@@ -83,10 +85,11 @@ const uploadSlip = multer({
   storage: slipStorage,
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const isPdfMime = file.mimetype === 'application/pdf';
-    const isPdfExt = path.extname(file.originalname || '').toLowerCase() === '.pdf';
-    if (!isPdfMime && !isPdfExt) {
-      return cb(new Error('Only PDF files are allowed.'));
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const isAllowedExt = ['.pdf', '.jpg', '.jpeg'].includes(ext);
+    const isAllowedMime = ['application/pdf', 'image/jpeg', 'image/jpg'].includes(file.mimetype);
+    if (!isAllowedExt && !isAllowedMime) {
+      return cb(new Error('Only PDF or JPG/JPEG files are allowed.'));
     }
     return cb(null, true);
   },
