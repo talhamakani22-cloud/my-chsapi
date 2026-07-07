@@ -19,7 +19,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonthIndex = now.getMonth();
-  const defaultSelectedMonth = `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}`;
+  const defaultSelectedMonth = '';
 
   useEffect(() => {
     const user = localStorage.getItem('user');
