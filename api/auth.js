@@ -55,6 +55,34 @@ async function verifyCollectionLogin({ collectionName, normalizedEmail, password
   return { ok: true, record, user: fallbackUser };
 }
 
+function getSignupTarget(signupMode) {
+  if (signupMode === 'resident-self') {
+    return { collectionName: 'resident', role: 'user', successMessage: 'Resident account registered successfully.' };
+  }
+
+  if (signupMode === 'reception-self') {
+    return { collectionName: 'reception', role: 'manager', successMessage: 'Reception account registered successfully.' };
+  }
+
+  if (signupMode === 'committee-self') {
+    return { collectionName: 'committee', role: 'admin', successMessage: 'Committee account registered successfully.' };
+  }
+
+  return { collectionName: 'resident', role: 'user', successMessage: 'Resident credentials created successfully.' };
+}
+
+function getAuthTarget(loginType) {
+  if (loginType === 'reception') {
+    return { collectionName: 'reception', role: 'manager' };
+  }
+
+  if (loginType === 'committee') {
+    return { collectionName: 'committee', role: 'admin' };
+  }
+
+  return { collectionName: 'resident', role: 'user' };
+}
+
 // GET login route
 router.get('/login', (req, res) => {
   res.json({ message: 'GET login route (Express)' });
@@ -98,25 +126,24 @@ router.post('/login', async (req, res) => {
 
   try {
     if (loginType === 'reception') {
-      const user = await User.findOne({ email: normalizedEmail });
-      if (!user) {
-        console.log('[LOGIN FAIL] Reception user not found:', normalizedEmail);
+      const receptionLogin = await verifyCollectionLogin({
+        collectionName: 'reception',
+        normalizedEmail,
+        password,
+        fallbackRole: 'manager',
+      });
+
+      if (!receptionLogin.ok) {
+        console.log('[LOGIN FAIL] Reception invalid credentials for:', normalizedEmail);
         return res.status(401).json({ success: false, message: 'Invalid credentials' });
       }
 
-      const isMatch = await user.comparePassword(password);
-      if (!isMatch) {
-        console.log('[LOGIN FAIL] Reception incorrect password for:', normalizedEmail);
-        return res.status(401).json({ success: false, message: 'Invalid credentials' });
-      }
-
-      if (!['manager', 'admin'].includes(user.role)) {
-        return res.status(403).json({
-          success: false,
-          message: 'This account cannot sign in as reception.',
-          suggestedLoginType: user.role === 'user' ? 'resident' : 'committee',
-        });
-      }
+      const user = receptionLogin.user || {
+        _id: receptionLogin.record.userId || receptionLogin.record._id,
+        email: receptionLogin.record.email || normalizedEmail,
+        role: 'manager',
+        name: receptionLogin.record.name || receptionLogin.record.username || '',
+      };
 
       req.session.user = { email: user.email, id: user._id, role: user.role, loginType };
       console.log('[LOGIN SUCCESS] reception', normalizedEmail);
@@ -236,9 +263,10 @@ router.post('/signup', async (req, res) => {
   }
 
   try {
-    const isResidentSelfSignup = signupMode === 'resident-self';
+    const { collectionName, role, successMessage } = getSignupTarget(signupMode);
+    const isSelfSignup = ['resident-self', 'reception-self', 'committee-self'].includes(signupMode);
 
-    if (!isResidentSelfSignup) {
+    if (!isSelfSignup) {
       if (!committeeEmail || !committeePassword) {
         return res.status(400).json({ success: false, message: 'Committee credentials are required.' });
       }
@@ -263,13 +291,13 @@ router.post('/signup', async (req, res) => {
       name: username.trim(),
       email: normalizedEmail,
       password,
-      role: 'user',
+      role,
       isActive: true,
     });
 
     try {
-      const residentCollection = mongoose.connection.db.collection('resident');
-      await residentCollection.updateOne(
+      const roleCollection = mongoose.connection.db.collection(collectionName);
+      await roleCollection.updateOne(
         { email: normalizedEmail },
         {
           $set: {
@@ -277,7 +305,7 @@ router.post('/signup', async (req, res) => {
             username: normalizedUsername,
             email: normalizedEmail,
             name: username.trim(),
-            role: 'user',
+            role,
             active: true,
             passwordHash: newResident.password,
             updatedAt: new Date(),
@@ -299,14 +327,81 @@ router.post('/signup', async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: isResidentSelfSignup
-        ? 'Resident account registered successfully.'
-        : 'Resident credentials created successfully.',
+      message: successMessage,
       user: newResident,
     });
   } catch (err) {
     console.error('[SIGNUP ERROR]', err);
     return res.status(500).json({ success: false, message: 'Server error.' });
+  }
+});
+
+router.post('/reset-password', async (req, res) => {
+  const { email, loginType, newPassword, confirmPassword } = req.body;
+
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail || !loginType || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Email, login type, and new password are required.' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
+  }
+
+  if (confirmPassword && newPassword !== confirmPassword) {
+    return res.status(400).json({ success: false, message: 'Passwords do not match.' });
+  }
+
+  if (!['reception', 'resident', 'committee'].includes(loginType)) {
+    return res.status(400).json({ success: false, message: 'Please select a valid login type.' });
+  }
+
+  try {
+    const { collectionName, role } = getAuthTarget(loginType);
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const collection = db.collection(collectionName);
+    const record = await collection.findOne({ email: normalizedEmail });
+    let userDoc = record?.userId ? await User.findById(record.userId) : null;
+
+    if (!userDoc) {
+      userDoc = await User.findOne({ email: normalizedEmail, role });
+    }
+
+    if (!userDoc) {
+      return res.status(404).json({ success: false, message: 'Account not found for the selected login type.' });
+    }
+
+    userDoc.password = newPassword;
+    userDoc.updatedAt = new Date();
+    await userDoc.save();
+
+    await collection.updateOne(
+      { email: normalizedEmail },
+      {
+        $set: {
+          userId: userDoc._id,
+          email: normalizedEmail,
+          role,
+          active: true,
+          passwordHash: userDoc.password,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          username: normalizedEmail.split('@')[0],
+          createdAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+
+    return res.json({ success: true, message: 'Password updated successfully.' });
+  } catch (err) {
+    console.error('[RESET PASSWORD ERROR]', err);
+    return res.status(500).json({ success: false, message: 'Failed to reset password.' });
   }
 });
 

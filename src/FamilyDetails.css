@@ -168,6 +168,24 @@
   text-decoration: underline;
 }
 
+.family-status-badge {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.family-status-badge.active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.family-status-badge.inactive {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
 .family-no-results {
   text-align: center;
   color: #475569;

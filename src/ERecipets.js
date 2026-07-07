@@ -9,6 +9,7 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [scope, setScope] = useState('resident');
   const [editingId, setEditingId] = useState('');
   const [editForm, setEditForm] = useState({
@@ -44,10 +45,12 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
         const amount = Number(row.amount || 0);
         const status = String(row.status || '').toLowerCase();
         const isPaid = status === 'paid';
+        const isActive = row.isActive !== false && status !== 'inactive';
 
         return {
           ...row,
           amount,
+          isActive,
           receivedAmount: isPaid ? amount : 0,
           pendingAmount: isPaid ? 0 : amount,
         };
@@ -143,20 +146,25 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
     const receiptId = String(row.id || '');
     if (!receiptId || savingAction) return;
 
-    const confirmed = window.confirm(`Delete receipt ${row.receiptNo || ''}?`);
+    const confirmed = window.confirm(`Mark receipt ${row.receiptNo || ''} as inactive?`);
     if (!confirmed) return;
 
     try {
       setSavingAction(true);
       setError('');
-      const res = await fetch(`${API_BASE_URL}/api/maintenance/${receiptId}`, {
-        method: 'DELETE',
+      const res = await fetch(`${API_BASE_URL}/api/maintenance/${receiptId}/status`, {
+        method: 'PUT',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isActive: !(row.isActive !== false && String(row.status || '').toLowerCase() !== 'inactive'),
+          status: row.status || 'Unpaid',
+        }),
       });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Failed to delete receipt.');
+        throw new Error(data.message || 'Failed to update receipt status.');
       }
 
       if (editingId === receiptId) {
@@ -164,7 +172,7 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
       }
       fetchReceipts();
     } catch (err) {
-      setError(err.message || 'Failed to delete receipt.');
+      setError(err.message || 'Failed to update receipt status.');
     } finally {
       setSavingAction(false);
     }
@@ -172,9 +180,16 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
 
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return rows;
+    const statusFilteredRows = rows.filter((row) => {
+      const active = row.isActive !== false && String(row.status || '').toLowerCase() !== 'inactive';
+      if (statusFilter === 'active') return active;
+      if (statusFilter === 'inactive') return !active;
+      return true;
+    });
 
-    return rows.filter((row) =>
+    if (!query) return statusFilteredRows;
+
+    return statusFilteredRows.filter((row) =>
       [
         row.receiptNo,
         row.ownerName,
@@ -188,7 +203,7 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
         .toLowerCase()
         .includes(query)
     );
-  }, [rows, searchQuery]);
+  }, [rows, searchQuery, statusFilter]);
 
   const perFlatAmount = useMemo(() => {
     if (!filteredRows.length) return 0;
@@ -249,6 +264,18 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
+            </div>
+            <div className="erecipets-status-filter">
+              <label>Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="erecipets-status-select"
+              >
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+                <option value="all">All</option>
+              </select>
             </div>
             <button className="refresh-btn" onClick={fetchReceipts}>🔄 Refresh</button>
           </div>
@@ -382,7 +409,7 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
                           ) : (
                             <div className="erecipets-action-group">
                               <button className="erecipets-action-btn edit" onClick={() => startEditRow(row)} disabled={savingAction}>Edit</button>
-                              <button className="erecipets-action-btn delete" onClick={() => handleDeleteRow(row)} disabled={savingAction}>Delete</button>
+                              <button className="erecipets-action-btn delete" onClick={() => handleDeleteRow(row)} disabled={savingAction}>{row.isActive !== false && String(row.status || '').toLowerCase() !== 'inactive' ? 'Deactivate' : 'Activate'}</button>
                             </div>
                           )}
                         </td>

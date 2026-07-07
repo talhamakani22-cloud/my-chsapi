@@ -110,12 +110,14 @@ router.get('/report', async (req, res) => {
     await ensureCollectionExists(db, E_RECIPTS_COLLECTION);
 
     const isAllView = canViewAllMaintenance(sessionUser);
+    const includeInactive = String(req.query.includeInactive || '').toLowerCase() === 'true';
     let receipts = [];
 
     if (isAllView) {
+      const receiptQuery = includeInactive ? {} : { isActive: { $ne: false } };
       receipts = await db
         .collection(RECEIPTS_COLLECTION)
-        .find({})
+        .find(receiptQuery)
         .sort({ createdAt: -1 })
         .limit(500)
         .toArray();
@@ -540,6 +542,70 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+router.put('/:id/status', async (req, res) => {
+  const sessionUser = req?.session?.user;
+  if (!sessionUser?.email) {
+    return res.status(401).json({ success: false, message: 'Please log in first.' });
+  }
+
+  if (!canManageMaintenance(sessionUser)) {
+    return res.status(403).json({ success: false, message: 'You are not authorized to update receipt status.' });
+  }
+
+  const receiptIdRaw = String(req.params.id || '').trim();
+  if (!mongoose.Types.ObjectId.isValid(receiptIdRaw)) {
+    return res.status(400).json({ success: false, message: 'Invalid receipt id.' });
+  }
+
+  try {
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const receiptId = new mongoose.Types.ObjectId(receiptIdRaw);
+    const isActive = String(req.body.isActive).toLowerCase() === 'true';
+    const updateResult = await db.collection(RECEIPTS_COLLECTION).updateOne(
+      { _id: receiptId },
+      {
+        $set: {
+          isActive,
+          status: isActive ? 'Active' : 'Inactive',
+          ...(isActive ? { $unset: { deletedAt: '' } } : { deletedAt: new Date() }),
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    if (!updateResult.matchedCount) {
+      return res.status(404).json({ success: false, message: 'Receipt not found.' });
+    }
+
+    await db.collection(INBOX_COLLECTION).updateMany(
+      { receiptId },
+      {
+        $set: {
+          isActive,
+          updatedAt: new Date(),
+        },
+      }
+    );
+    await db.collection(E_RECIPTS_COLLECTION).updateMany(
+      { receiptId },
+      {
+        $set: {
+          isActive,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    return res.json({ success: true, message: `Receipt marked ${isActive ? 'active' : 'inactive'} successfully.` });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to update receipt.' });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   const sessionUser = req?.session?.user;
   if (!sessionUser?.email) {
@@ -562,18 +628,109 @@ router.delete('/:id', async (req, res) => {
     }
 
     const receiptId = new mongoose.Types.ObjectId(receiptIdRaw);
-    const deleteResult = await db.collection(RECEIPTS_COLLECTION).deleteOne({ _id: receiptId });
+    const deleteResult = await db.collection(RECEIPTS_COLLECTION).updateOne(
+      { _id: receiptId, isActive: { $ne: false } },
+      {
+        $set: {
+          isActive: false,
+          status: 'Inactive',
+          deletedAt: new Date(),
+          updatedAt: new Date(),
+        },
+      }
+    );
 
-    if (!deleteResult.deletedCount) {
+    if (!deleteResult.matchedCount) {
       return res.status(404).json({ success: false, message: 'Receipt not found.' });
     }
 
-    await db.collection(INBOX_COLLECTION).deleteMany({ receiptId });
-    await db.collection(E_RECIPTS_COLLECTION).deleteMany({ receiptId });
+    await db.collection(INBOX_COLLECTION).updateMany(
+      { receiptId },
+      {
+        $set: {
+          isActive: false,
+          updatedAt: new Date(),
+        },
+      }
+    );
+    await db.collection(E_RECIPTS_COLLECTION).updateMany(
+      { receiptId },
+      {
+        $set: {
+          isActive: false,
+          updatedAt: new Date(),
+        },
+      }
+    );
 
-    return res.json({ success: true, message: 'Receipt deleted successfully.' });
+    return res.json({ success: true, message: 'Receipt marked inactive successfully.' });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message || 'Failed to delete receipt.' });
+    return res.status(500).json({ success: false, message: err.message || 'Failed to update receipt.' });
+  }
+});
+
+router.put('/:id/status', async (req, res) => {
+  const sessionUser = req?.session?.user;
+  if (!sessionUser?.email) {
+    return res.status(401).json({ success: false, message: 'Please log in first.' });
+  }
+
+  if (!canManageMaintenance(sessionUser)) {
+    return res.status(403).json({ success: false, message: 'You are not authorized to update receipts.' });
+  }
+
+  const receiptIdRaw = String(req.params.id || '').trim();
+  if (!mongoose.Types.ObjectId.isValid(receiptIdRaw)) {
+    return res.status(400).json({ success: false, message: 'Invalid receipt id.' });
+  }
+
+  try {
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const receiptId = new mongoose.Types.ObjectId(receiptIdRaw);
+    const isActive = String(req.body.isActive).toLowerCase() === 'true';
+
+    const updateResult = await db.collection(RECEIPTS_COLLECTION).updateOne(
+      { _id: receiptId },
+      {
+        $set: {
+          isActive,
+          status: isActive ? String(req.body.status || 'Unpaid').trim() : 'Inactive',
+          deletedAt: isActive ? null : new Date(),
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    if (!updateResult.matchedCount) {
+      return res.status(404).json({ success: false, message: 'Receipt not found.' });
+    }
+
+    await db.collection(INBOX_COLLECTION).updateMany(
+      { receiptId },
+      {
+        $set: {
+          isActive,
+          updatedAt: new Date(),
+        },
+      }
+    );
+    await db.collection(E_RECIPTS_COLLECTION).updateMany(
+      { receiptId },
+      {
+        $set: {
+          isActive,
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    return res.json({ success: true, message: `Receipt marked ${isActive ? 'active' : 'inactive'} successfully.` });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to update receipt.' });
   }
 });
 

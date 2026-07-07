@@ -6,11 +6,13 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.on
 function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
   const [records, setRecords] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [editingRecord, setEditingRecord] = useState(null);
   const [editForm, setEditForm] = useState({ residentName: '', flatNumber: '', familyMembers: [] });
   const [savingEdit, setSavingEdit] = useState(false);
+  const isRecordActive = (record) => record?.isActive !== false;
 
   useEffect(() => {
     const user = localStorage.getItem('user');
@@ -26,6 +28,9 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
       const params = new URLSearchParams();
       if (searchQuery.trim()) {
         params.append('search', searchQuery.trim());
+      }
+      if (statusFilter === 'all') {
+        params.append('includeInactive', 'true');
       }
       const res = await fetch(`${API_BASE_URL}/api/family?${params.toString()}`, { credentials: 'include' });
       const data = await res.json();
@@ -50,11 +55,15 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
     return () => {
       clearInterval(intervalId);
     };
-  }, []);
+  }, [searchQuery, statusFilter]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     fetchFamilyRecords();
+  };
+
+  const handleStatusFilterChange = (value) => {
+    setStatusFilter(value);
   };
 
   const openEditModal = (record) => {
@@ -145,20 +154,22 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE_URL}/api/family/${record._id}`, {
-        method: 'DELETE',
+      const res = await fetch(`${API_BASE_URL}/api/family/${record._id}/status`, {
+        method: 'PUT',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !(record.isActive !== false) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Failed to delete family details.');
+        throw new Error(data.message || 'Failed to update family status.');
       }
       if (editingRecord?._id === record._id) {
         closeEditModal();
       }
       fetchFamilyRecords();
     } catch (err) {
-      setError(err.message || 'Failed to delete family details.');
+      setError(err.message || 'Failed to update family status.');
     }
     setLoading(false);
   };
@@ -198,6 +209,14 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
             </div>
             <button className="family-search-btn" type="submit">Search</button>
             <button className="family-refresh-btn" type="button" onClick={fetchFamilyRecords}>Refresh</button>
+            <div className="family-status-filter">
+              <label>Status</label>
+              <select value={statusFilter} onChange={(e) => handleStatusFilterChange(e.target.value)} className="family-status-select">
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+                <option value="all">All</option>
+              </select>
+            </div>
           </form>
           <div className="family-results-count">
             {loading ? 'Loading...' : `Showing ${records.length} records`}
@@ -214,6 +233,7 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
                 <th>Members</th>
                 <th>CNIC PDF</th>
                 <th>Uploaded At</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -224,6 +244,7 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
                   const uploadedAt = record.uploadedAt
                     ? new Date(record.uploadedAt).toLocaleString()
                     : '-';
+                  const isActive = record.isActive !== false;
 
                   return (
                     <tr key={String(record._id || `${record.flatNumber}-${record.uploadedAt}`)}>
@@ -241,11 +262,16 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
                       </td>
                       <td>{uploadedAt}</td>
                       <td>
+                        <span className={`family-status-badge ${isActive ? 'active' : 'inactive'}`}>
+                          {isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td>
                         <button className="family-edit-btn" onClick={() => openEditModal(record)}>
                           Edit
                         </button>
                         <button className="family-delete-btn" onClick={() => handleDeleteRecord(record)}>
-                          Delete
+                          {record.isActive !== false ? 'Deactivate' : 'Activate'}
                         </button>
                       </td>
                     </tr>
@@ -253,7 +279,7 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
                 })
               ) : (
                 <tr>
-                  <td colSpan="6" className="family-no-results">No family records found</td>
+                  <td colSpan="7" className="family-no-results">No family records found</td>
                 </tr>
               )}
             </tbody>
