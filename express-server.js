@@ -12,6 +12,9 @@ const PORT = process.env.PORT || 1001;
 const isProduction = process.env.NODE_ENV === 'production';
 const isRender = String(process.env.RENDER || '').toLowerCase() === 'true';
 const forceCrossSiteCookie = String(process.env.SESSION_CROSS_SITE || '').toLowerCase() === 'true' || isRender;
+const uploadsRoot = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.join(__dirname, 'uploads');
 const allowedOrigins = String(process.env.CORS_ORIGINS || '')
   .split(',')
   .map((o) => o.trim())
@@ -79,7 +82,7 @@ app.use('/api/maintenance', maintenanceRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/meeting-chat', meetingChatRouter);
 app.use('/api/complaints', complaintsRouter);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadsRoot));
 
 // Protected route
 

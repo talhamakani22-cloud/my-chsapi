@@ -4,8 +4,8 @@ import './Dashboard.css';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
 
 function Dashboard({ onNavigateToReport, onNavigateToFamilyDetails, onNavigateToVehicleRegistration, onNavigateToERecipets, onNavigateToComplaintTracking, sessionUser, onLogout }) {
-  const loginType = String(sessionUser?.loginType || '').toLowerCase();
-  const isReception = loginType === 'reception';
+  const loginType = String(sessionUser?.loginType || '').toLowerCase().trim().replace(/[-_\s]+/g, '');
+  const isReception = loginType === 'reception' || loginType === 'receptiondesk';
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

@@ -30,6 +30,7 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
   const [editStatus, setEditStatus] = useState('Open');
   const [editStatusNote, setEditStatusNote] = useState('');
   const [savingStatusId, setSavingStatusId] = useState('');
+  const [expandedId, setExpandedId] = useState('');
 
   useEffect(() => {
     const user = localStorage.getItem('user');
@@ -124,6 +125,21 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
     return () => clearInterval(intervalId);
   }, [fetchComplaints]);
 
+  const buildMediaUrl = (mediaUri) => {
+    const source = String(mediaUri || '').trim();
+    if (!source) return '';
+    if (/^https?:\/\//i.test(source)) return source;
+    if (source.startsWith('/')) return `${API_BASE_URL}${source}`;
+    return `${API_BASE_URL}/${source}`;
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return '-';
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return String(value);
+    return dt.toLocaleString();
+  };
+
   return (
     <div className="complaint-tracking-page">
       <div className="complaint-tracking-header">
@@ -167,7 +183,12 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
           rows.map((row) => {
             const complaintId = String(row._id || row.id || '');
             const isEditing = canManage && editingId === complaintId;
+            const isExpanded = expandedId === complaintId;
             const progress = statusProgress(row.status);
+            const mediaUrl = buildMediaUrl(row.mediaUri);
+            const hasMedia = Boolean(mediaUrl);
+            const mediaAvailable = row.mediaAvailable !== false;
+            const mediaKind = String(row.mediaKind || '').toLowerCase();
             return (
               <div className="complaint-card" key={String(row._id || row.id || row.ticketNo || Math.random())}>
                 <div className="complaint-card-head">
@@ -191,6 +212,52 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
                 <div className="complaint-status-note">
                   <strong>Follow-up Note:</strong> {row.statusNote || 'No note added yet.'}
                 </div>
+
+                <div className="complaint-view-details-wrap">
+                  <button
+                    className="complaint-view-details-btn"
+                    onClick={() => setExpandedId(isExpanded ? '' : complaintId)}
+                  >
+                    {isExpanded ? 'Hide Details' : 'View Details'}
+                  </button>
+                </div>
+
+                {isExpanded ? (
+                  <div className="complaint-details-box">
+                    <div className="complaint-details-grid">
+                      <div><strong>Ticket:</strong> {row.ticketNo || '-'}</div>
+                      <div><strong>Flat:</strong> {row.flatNumber || '-'}</div>
+                      <div><strong>Type:</strong> {row.complaintType || 'General'}</div>
+                      <div><strong>Status:</strong> {row.status || '-'}</div>
+                      <div><strong>Raised By:</strong> {row.sender?.email || '-'}</div>
+                      <div><strong>Sender Role:</strong> {row.sender?.loginType || row.sender?.role || '-'}</div>
+                      <div><strong>Created:</strong> {formatDateTime(row.createdAt)}</div>
+                      <div><strong>Updated:</strong> {formatDateTime(row.updatedAt)}</div>
+                      <div><strong>Media Type:</strong> {row.mediaMimeType || '-'}</div>
+                    </div>
+                    {hasMedia ? (
+                      <div className="complaint-media-wrap">
+                        <strong>Attachment:</strong>
+                        {mediaAvailable ? (
+                          <>
+                            {mediaKind === 'video' ? (
+                              <video className="complaint-media-preview" controls src={mediaUrl} />
+                            ) : (
+                              <img className="complaint-media-preview" src={mediaUrl} alt="Complaint attachment" />
+                            )}
+                            <a className="complaint-media-link" href={mediaUrl} target="_blank" rel="noreferrer">
+                              Open full attachment
+                            </a>
+                          </>
+                        ) : (
+                          <div className="complaint-media-missing">Attachment file is missing on server. Please ask resident to re-upload.</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="complaint-media-wrap"><strong>Attachment:</strong> Not available</div>
+                    )}
+                  </div>
+                ) : null}
 
                 {canManage ? (
                   <div className="complaint-manage-box">

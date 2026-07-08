@@ -14,7 +14,8 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [sessionUser, setSessionUser] = useState(null);
 
-  const isReceptionLogin = String(sessionUser?.loginType || '').toLowerCase() === 'reception';
+  const normalizedLoginType = String(sessionUser?.loginType || '').toLowerCase().trim().replace(/[-_\s]+/g, '');
+  const isReceptionLogin = normalizedLoginType === 'reception' || normalizedLoginType === 'receptiondesk';
 
   const canAccessScreen = (targetScreen) => {
     if (!isReceptionLogin) return true;

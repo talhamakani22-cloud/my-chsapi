@@ -7,8 +7,11 @@ const { getAccessScope, buildFlatScopedRegex } = require('./accessScope');
 
 const router = express.Router();
 const COMPLAINTS_COLLECTION = 'complaints';
+const uploadsRoot = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.join(__dirname, '..', 'uploads');
 
-const uploadDir = path.join(__dirname, '..', 'uploads', 'complaints');
+const uploadDir = path.join(uploadsRoot, 'complaints');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -44,13 +47,15 @@ const upload = multer({
 });
 
 function canUseComplaints(req) {
-  const loginType = String(req?.session?.user?.loginType || '').toLowerCase();
-  return loginType === 'resident' || loginType === 'committee' || loginType === 'reception';
+  const rawLoginType = String(req?.session?.user?.loginType || '').toLowerCase().trim();
+  const loginType = rawLoginType.replace(/[-_\s]+/g, '');
+  return loginType === 'resident' || loginType === 'committee' || loginType === 'reception' || loginType === 'receptiondesk';
 }
 
 function canManageComplaints(req) {
-  const loginType = String(req?.session?.user?.loginType || '').toLowerCase();
-  return loginType === 'reception';
+  const rawLoginType = String(req?.session?.user?.loginType || '').toLowerCase().trim();
+  const loginType = rawLoginType.replace(/[-_\s]+/g, '');
+  return loginType === 'reception' || loginType === 'receptiondesk';
 }
 
 router.get('/', async (req, res) => {
@@ -104,7 +109,17 @@ router.get('/', async (req, res) => {
       .limit(limit)
       .toArray();
 
-    return res.json({ success: true, rows, canManage: canManageComplaints(req) });
+    const normalizedRows = rows.map((row) => {
+      const mediaUri = String(row?.mediaUri || '');
+      const mediaFileName = mediaUri.split('/').pop() || '';
+      const mediaExists = mediaFileName ? fs.existsSync(path.join(uploadDir, mediaFileName)) : false;
+      return {
+        ...row,
+        mediaAvailable: mediaExists,
+      };
+    });
+
+    return res.json({ success: true, rows: normalizedRows, canManage: canManageComplaints(req) });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message || 'Failed to fetch complaints.' });
   }
@@ -151,6 +166,7 @@ router.post('/', upload.single('complaintMedia'), async (req, res) => {
       complaintType,
       description,
       mediaUri,
+      mediaAvailable: true,
       mediaMimeType: req.file.mimetype,
       mediaKind,
       flatNumber: access.flatNumber || '',

@@ -6,8 +6,11 @@ const fs = require('fs');
 
 const router = express.Router();
 const MEETING_CHAT_COLLECTION = 'meeting_chat';
+const uploadsRoot = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.join(__dirname, '..', 'uploads');
 
-const uploadDir = path.join(__dirname, '..', 'uploads', 'meeting-chat-audio');
+const uploadDir = path.join(uploadsRoot, 'meeting-chat-audio');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -74,7 +77,17 @@ router.get('/', async (req, res) => {
       .limit(500)
       .toArray();
 
-    return res.json({ success: true, rows });
+    const normalizedRows = rows.map((row) => {
+      const audioUri = String(row?.audioUri || '').trim();
+      const storedFileName = audioUri.split('/').pop() || '';
+      const audioAvailable = storedFileName ? fs.existsSync(path.join(uploadDir, storedFileName)) : false;
+      return {
+        ...row,
+        audioAvailable,
+      };
+    });
+
+    return res.json({ success: true, rows: normalizedRows });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message || 'Failed to fetch meeting chat.' });
   }

@@ -7,8 +7,11 @@ const { getAccessScope, buildFlatScopedRegex } = require('./accessScope');
 
 const router = express.Router();
 const VEHICLE_COLLECTION = 'vehicle_registration';
+const uploadsRoot = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.join(__dirname, '..', 'uploads');
 
-const uploadDir = path.join(__dirname, '..', 'uploads', 'vehicle-cards');
+const uploadDir = path.join(uploadsRoot, 'vehicle-cards');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -73,7 +76,19 @@ router.get('/', async (req, res) => {
       .limit(500)
       .toArray();
 
-    return res.json({ success: true, records });
+    const normalized = records.map((record) => {
+      const filePath = String(record.filePath || '');
+      const storedFileName = String(record.storedFileName || filePath.split('/').pop() || '').trim();
+      const fileAvailable = storedFileName ? fs.existsSync(path.join(uploadDir, storedFileName)) : false;
+      const runtimeFileUrl = filePath ? `${req.protocol}://${req.get('host')}${filePath}` : '';
+      return {
+        ...record,
+        fileAvailable,
+        fileUrl: runtimeFileUrl || record.fileUrl || '',
+      };
+    });
+
+    return res.json({ success: true, records: normalized });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message || 'Failed to fetch vehicle records.' });
   }

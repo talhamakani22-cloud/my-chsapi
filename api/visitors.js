@@ -8,6 +8,9 @@ const fs = require('fs');
 
 const express = require('express');
 const router = express.Router();
+const uploadsRoot = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.join(__dirname, '..', 'uploads');
 
 const normalizeGender = (value = '') => {
   const v = String(value).trim().toUpperCase();
@@ -59,7 +62,18 @@ router.get('/', async (req, res) => {
     }
 
     const visitors = await Visitor.find(query).sort({ createdAt: -1 });
-    res.json({ success: true, visitors });
+    const scansDir = path.join(uploadsRoot, 'cnic-scans');
+    const normalizedVisitors = visitors.map((visitorDoc) => {
+      const visitor = typeof visitorDoc?.toObject === 'function' ? visitorDoc.toObject() : visitorDoc;
+      const scannedImageUri = String(visitor.scannedImageUri || '').trim();
+      const storedFileName = scannedImageUri.split('/').pop() || '';
+      const scannedImageAvailable = storedFileName ? fs.existsSync(path.join(scansDir, storedFileName)) : false;
+      return {
+        ...visitor,
+        scannedImageAvailable,
+      };
+    });
+    res.json({ success: true, visitors: normalizedVisitors });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch visitors', error: err.message });
   }
@@ -69,7 +83,7 @@ router.get('/', async (req, res) => {
 // Pakistani CNIC format: 12345-1234567-1
 const cnicPattern = /^[0-9]{5}-[0-9]{7}-[0-9]{1}$/;
 
-const uploadDir = path.join(__dirname, '..', 'uploads', 'cnic-scans');
+const uploadDir = path.join(uploadsRoot, 'cnic-scans');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }

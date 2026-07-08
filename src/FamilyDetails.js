@@ -3,6 +3,14 @@ import './FamilyDetails.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
 
+const buildFileUrl = (value) => {
+  const source = String(value || '').trim();
+  if (!source) return '';
+  if (/^https?:\/\//i.test(source)) return source;
+  if (source.startsWith('/')) return `${API_BASE_URL}${source}`;
+  return `${API_BASE_URL}/${source}`;
+};
+
 function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
   const [records, setRecords] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -245,6 +253,8 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
                     ? new Date(record.uploadedAt).toLocaleString()
                     : '-';
                   const isActive = record.isActive !== false;
+                  const fileUrl = buildFileUrl(record.filePath || record.fileUrl);
+                  const fileAvailable = record.fileAvailable !== false;
 
                   return (
                     <tr key={String(record._id || `${record.flatNumber}-${record.uploadedAt}`)}>
@@ -252,10 +262,14 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
                       <td>{record.flatNumber || '-'}</td>
                       <td>{members.length}</td>
                       <td>
-                        {record.fileUrl ? (
-                          <a href={record.fileUrl} target="_blank" rel="noreferrer" className="family-file-link">
-                            {record.fileName || 'Open PDF'}
-                          </a>
+                        {fileUrl ? (
+                          fileAvailable ? (
+                            <a href={fileUrl} target="_blank" rel="noreferrer" className="family-file-link">
+                              {record.fileName || 'Open PDF'}
+                            </a>
+                          ) : (
+                            <span className="family-file-link" style={{ color: '#fca5a5' }}>File missing</span>
+                          )
                         ) : (
                           '-'
                         )}

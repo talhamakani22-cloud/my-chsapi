@@ -4,6 +4,14 @@ import './ERecipets.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
 
+const buildFileUrl = (value) => {
+  const source = String(value || '').trim();
+  if (!source) return '';
+  if (/^https?:\/\//i.test(source)) return source;
+  if (source.startsWith('/')) return `${API_BASE_URL}${source}`;
+  return `${API_BASE_URL}/${source}`;
+};
+
 function ERecipets({ onBackToDashboard, onRequireLogin }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -384,15 +392,19 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
                         )}
                       </td>
                       <td>
-                        {row.paymentSlipUrl ? (
-                          <a
-                            className="erecipets-slip-link"
-                            href={row.paymentSlipUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {row.paymentSlipName ? 'View Slip' : 'Open Proof'}
-                          </a>
+                        {buildFileUrl(row.paymentSlipPath || row.paymentSlipUrl) ? (
+                          row.paymentSlipAvailable === false ? (
+                            <span className="erecipets-slip-link" style={{ color: '#fca5a5' }}>File missing</span>
+                          ) : (
+                            <a
+                              className="erecipets-slip-link"
+                              href={buildFileUrl(row.paymentSlipPath || row.paymentSlipUrl)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {row.paymentSlipName ? 'View Slip' : 'Open Proof'}
+                            </a>
+                          )
                         ) : (
                           '-'
                         )}

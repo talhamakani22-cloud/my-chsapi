@@ -427,14 +427,18 @@ function Report({ onBackToDashboard, onRequireLogin }) {
                     <td>{visitor.purposeOfVisit || '-'}</td>
                     <td>
                       {visitor.scannedImageUri ? (
-                        <a
-                          href={buildFileUrl(visitor.scannedImageUri)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="cnic-scan-link"
-                        >
-                          View PDF
-                        </a>
+                        visitor.scannedImageAvailable === false ? (
+                          <span className="cnic-scan-link" style={{ color: '#fca5a5' }}>File missing</span>
+                        ) : (
+                          <a
+                            href={buildFileUrl(visitor.scannedImageUri)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="cnic-scan-link"
+                          >
+                            View PDF
+                          </a>
+                        )
                       ) : (
                         '-'
                       )}

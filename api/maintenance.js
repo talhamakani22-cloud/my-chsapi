@@ -11,6 +11,9 @@ const RECEIPTS_COLLECTION = 'maintenance_receipts';
 const INBOX_COLLECTION = 'maintenance_inbox';
 const E_RECIPTS_COLLECTION = 'e reciept';
 const FAMILY_COLLECTION = 'family_detail';
+const uploadsRoot = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.join(__dirname, '..', 'uploads');
 
 function normalizeFlatNumber(flatNumber = '') {
   const value = String(flatNumber || '').trim();
@@ -58,7 +61,7 @@ function canManageMaintenance(sessionUser) {
   return role === 'admin' || role === 'manager' || loginType === 'committee';
 }
 
-const slipsUploadDir = path.join(__dirname, '..', 'uploads', 'maintenance-slips');
+const slipsUploadDir = path.join(uploadsRoot, 'maintenance-slips');
 if (!fs.existsSync(slipsUploadDir)) {
   fs.mkdirSync(slipsUploadDir, { recursive: true });
 }
@@ -137,6 +140,8 @@ router.get('/report', async (req, res) => {
             paidUsers: 0,
             paidSlipCount: 0,
             paymentSlipUrl: '',
+            paymentSlipPath: '',
+            paymentSlipStoredFileName: '',
             paymentSlipName: '',
           });
         }
@@ -153,6 +158,8 @@ router.get('/report', async (req, res) => {
           stats.paidSlipCount += 1;
           if (!stats.paymentSlipUrl) {
             stats.paymentSlipUrl = row.paymentSlipUrl;
+            stats.paymentSlipPath = row.paymentSlipPath || '';
+            stats.paymentSlipStoredFileName = row.paymentSlipStoredFileName || '';
             stats.paymentSlipName = row.paymentSlipName || '';
           }
         }
@@ -164,6 +171,8 @@ router.get('/report', async (req, res) => {
           paidUsers: 0,
           paidSlipCount: 0,
           paymentSlipUrl: '',
+          paymentSlipPath: '',
+          paymentSlipStoredFileName: '',
           paymentSlipName: '',
         };
         const totalUsers = Number(stats.totalUsers || 0);
@@ -172,6 +181,16 @@ router.get('/report', async (req, res) => {
         const amount = Number(receipt.amount || 0);
         const receiptStatus = String(receipt.status || '').toLowerCase();
         const isPaid = receiptStatus === 'paid';
+        const legacyUrl = String(stats.paymentSlipUrl || '').trim();
+        const paymentSlipPath = String(stats.paymentSlipPath || '').trim()
+          || (legacyUrl.startsWith('/uploads/') ? legacyUrl : '');
+        const paymentSlipStoredFileName = String(stats.paymentSlipStoredFileName || paymentSlipPath.split('/').pop() || '').trim();
+        const paymentSlipAvailable = paymentSlipStoredFileName
+          ? fs.existsSync(path.join(slipsUploadDir, paymentSlipStoredFileName))
+          : false;
+        const paymentSlipUrl = paymentSlipPath
+          ? `${req.protocol}://${req.get('host')}${paymentSlipPath}`
+          : legacyUrl;
 
         return {
           id: receipt._id,
@@ -190,7 +209,9 @@ router.get('/report', async (req, res) => {
           receivedAmount: isPaid ? amount : 0,
           pendingAmount: isPaid ? 0 : amount,
           paidSlipCount: Number(stats.paidSlipCount || 0),
-          paymentSlipUrl: stats.paymentSlipUrl || '',
+          paymentSlipPath,
+          paymentSlipUrl,
+          paymentSlipAvailable,
           paymentSlipName: stats.paymentSlipName || '',
           generatedAt: receipt.generatedAt || receipt.createdAt || null,
         };
@@ -220,6 +241,14 @@ router.get('/report', async (req, res) => {
       const receipt = receiptsMap.get(String(row.receiptId));
       const amount = Number(receipt?.amount || 0);
       const residentStatus = String(row.status || 'unread').toLowerCase();
+      const paymentSlipPath = String(row.paymentSlipPath || '').trim();
+      const paymentSlipStoredFileName = String(row.paymentSlipStoredFileName || paymentSlipPath.split('/').pop() || '').trim();
+      const paymentSlipAvailable = paymentSlipStoredFileName
+        ? fs.existsSync(path.join(slipsUploadDir, paymentSlipStoredFileName))
+        : false;
+      const paymentSlipUrl = paymentSlipPath
+        ? `${req.protocol}://${req.get('host')}${paymentSlipPath}`
+        : String(row.paymentSlipUrl || '');
 
       return {
         id: row.receiptId,
@@ -238,7 +267,9 @@ router.get('/report', async (req, res) => {
         receivedAmount: residentStatus === 'paid' ? amount : 0,
         pendingAmount: residentStatus === 'paid' ? 0 : amount,
         paidSlipCount: row.paymentSlipUrl ? 1 : 0,
-        paymentSlipUrl: row.paymentSlipUrl || '',
+        paymentSlipPath,
+        paymentSlipUrl,
+        paymentSlipAvailable,
         paymentSlipName: row.paymentSlipName || '',
         generatedAt: receipt?.generatedAt || receipt?.createdAt || row.createdAt || null,
       };
