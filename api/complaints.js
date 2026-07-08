@@ -46,16 +46,28 @@ const upload = multer({
   },
 });
 
+function normalizeLoginType(value = '') {
+  return String(value || '').toLowerCase().trim().replace(/[-_\s]+/g, '');
+}
+
+function isCommitteeLogin(loginType = '') {
+  const normalized = normalizeLoginType(loginType);
+  return normalized === 'committee' || normalized === 'committeehead';
+}
+
 function canUseComplaints(req) {
-  const rawLoginType = String(req?.session?.user?.loginType || '').toLowerCase().trim();
-  const loginType = rawLoginType.replace(/[-_\s]+/g, '');
-  return loginType === 'resident' || loginType === 'committee' || loginType === 'reception' || loginType === 'receptiondesk';
+  const loginType = normalizeLoginType(req?.session?.user?.loginType || '');
+  return loginType === 'resident' || isCommitteeLogin(loginType) || loginType === 'reception' || loginType === 'receptiondesk';
 }
 
 function canManageComplaints(req) {
-  const rawLoginType = String(req?.session?.user?.loginType || '').toLowerCase().trim();
-  const loginType = rawLoginType.replace(/[-_\s]+/g, '');
+  const loginType = normalizeLoginType(req?.session?.user?.loginType || '');
   return loginType === 'reception' || loginType === 'receptiondesk';
+}
+
+function canCreateComplaints(req) {
+  const loginType = normalizeLoginType(req?.session?.user?.loginType || '');
+  return loginType === 'resident';
 }
 
 router.get('/', async (req, res) => {
@@ -131,8 +143,8 @@ router.post('/', upload.single('complaintMedia'), async (req, res) => {
     return res.status(401).json({ success: false, message: 'Please log in first.' });
   }
 
-  if (String(sessionUser.loginType || '').toLowerCase() !== 'resident') {
-    return res.status(403).json({ success: false, message: 'Only residents can create complaints.' });
+  if (!canCreateComplaints(req)) {
+    return res.status(403).json({ success: false, message: 'Committee head can only view complaints. Only residents can create complaints.' });
   }
 
   const description = String(req.body.description || '').trim();
@@ -210,6 +222,8 @@ router.put('/:id/status', async (req, res) => {
 
   const status = String(req.body.status || '').trim();
   const statusNote = String(req.body.statusNote || '').trim();
+  const normalizedStatus = status.toLowerCase();
+  const shouldDeactivate = normalizedStatus === 'closed';
 
   if (!status) {
     return res.status(400).json({ success: false, message: 'Status is required.' });
@@ -230,6 +244,7 @@ router.put('/:id/status', async (req, res) => {
         $set: {
           status,
           statusNote,
+          isActive: shouldDeactivate ? false : true,
           updatedAt: new Date(),
         },
       },
