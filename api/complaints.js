@@ -45,12 +45,12 @@ const upload = multer({
 
 function canUseComplaints(req) {
   const loginType = String(req?.session?.user?.loginType || '').toLowerCase();
-  return loginType === 'resident' || loginType === 'committee';
+  return loginType === 'resident' || loginType === 'committee' || loginType === 'reception';
 }
 
 function canManageComplaints(req) {
   const loginType = String(req?.session?.user?.loginType || '').toLowerCase();
-  return loginType === 'committee';
+  return loginType === 'reception';
 }
 
 router.get('/', async (req, res) => {
@@ -60,7 +60,7 @@ router.get('/', async (req, res) => {
   }
 
   if (!canUseComplaints(req)) {
-    return res.status(403).json({ success: false, message: 'Complaints are available for resident and committee only.' });
+    return res.status(403).json({ success: false, message: 'Complaints are available for resident, reception, and committee only.' });
   }
 
   try {
@@ -70,15 +70,38 @@ router.get('/', async (req, res) => {
       throw new Error('Database connection is not ready.');
     }
 
+    const status = String(req.query.status || '').trim();
+    const search = String(req.query.q || '').trim();
+    const requestedLimit = Number.parseInt(String(req.query.limit || ''), 10);
+    const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(requestedLimit, 1000)) : 500;
+
     const query = { isActive: { $ne: false } };
     if (access.scope === 'resident') {
       query.flatNumber = { $regex: buildFlatScopedRegex(access.flatNumber) };
     }
 
+    if (status) {
+      query.status = status;
+    }
+
+    if (search) {
+      const safe = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(safe, 'i');
+      query.$or = [
+        { ticketNo: regex },
+        { flatNumber: regex },
+        { complaintType: regex },
+        { description: regex },
+        { status: regex },
+        { statusNote: regex },
+        { 'sender.email': regex },
+      ];
+    }
+
     const rows = await db.collection(COMPLAINTS_COLLECTION)
       .find(query)
       .sort({ createdAt: -1 })
-      .limit(500)
+      .limit(limit)
       .toArray();
 
     return res.json({ success: true, rows, canManage: canManageComplaints(req) });
@@ -161,7 +184,7 @@ router.put('/:id/status', async (req, res) => {
   }
 
   if (!canManageComplaints(req)) {
-    return res.status(403).json({ success: false, message: 'Only committee can update complaint status.' });
+    return res.status(403).json({ success: false, message: 'Only reception desk can update complaint status.' });
   }
 
   const complaintId = String(req.params.id || '').trim();
@@ -197,11 +220,15 @@ router.put('/:id/status', async (req, res) => {
       { returnDocument: 'after' }
     );
 
-    if (!result) {
+    const row = result && typeof result === 'object' && Object.prototype.hasOwnProperty.call(result, 'value')
+      ? result.value
+      : result;
+
+    if (!row) {
       return res.status(404).json({ success: false, message: 'Complaint not found.' });
     }
 
-    return res.json({ success: true, message: 'Complaint status updated successfully.', row: result });
+    return res.json({ success: true, message: 'Complaint status updated successfully.', row });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message || 'Failed to update complaint status.' });
   }
