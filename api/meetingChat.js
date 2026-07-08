@@ -55,6 +55,15 @@ function isMeetingChatAllowed(req) {
   return loginType === 'resident' || loginType === 'committee';
 }
 
+function resolveSenderName(sessionUser) {
+  const directName = String(sessionUser?.name || sessionUser?.username || '').trim();
+  if (directName) return directName;
+
+  const email = String(sessionUser?.email || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) return 'User';
+  return email.split('@')[0];
+}
+
 router.get('/', async (req, res) => {
   const sessionUser = req?.session?.user;
   if (!sessionUser?.email) {
@@ -120,6 +129,8 @@ router.post('/', async (req, res) => {
       isActive: true,
       sender: {
         email: String(sessionUser.email || '').toLowerCase(),
+        name: resolveSenderName(sessionUser),
+        username: resolveSenderName(sessionUser),
         role: String(sessionUser.role || '').toLowerCase(),
         loginType: String(sessionUser.loginType || '').toLowerCase(),
       },
@@ -139,6 +150,11 @@ router.post('/', async (req, res) => {
 });
 
 router.post('/audio', uploadAudio.single('voiceMessage'), async (req, res) => {
+  return res.status(410).json({
+    success: false,
+    message: 'Voice recording is disabled in meeting chat.',
+  });
+
   const sessionUser = req?.session?.user;
   if (!sessionUser?.email) {
     return res.status(401).json({ success: false, message: 'Please log in first.' });
@@ -169,6 +185,8 @@ router.post('/audio', uploadAudio.single('voiceMessage'), async (req, res) => {
       isActive: true,
       sender: {
         email: String(sessionUser.email || '').toLowerCase(),
+        name: resolveSenderName(sessionUser),
+        username: resolveSenderName(sessionUser),
         role: String(sessionUser.role || '').toLowerCase(),
         loginType: String(sessionUser.loginType || '').toLowerCase(),
       },
