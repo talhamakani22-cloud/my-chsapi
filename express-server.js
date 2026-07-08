@@ -43,8 +43,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+app.use(bodyParser.json({ limit: '100mb' }));
+app.use(bodyParser.urlencoded({ limit: '100mb', extended: true }));
 app.use(session({
   secret: 'your-secret-key',
   resave: false,
@@ -67,6 +67,8 @@ const ocrRouter = require('./api/ocr');
 const vehicleRouter = require('./api/vehicle');
 const maintenanceRouter = require('./api/maintenance');
 const notificationsRouter = require('./api/notifications');
+const meetingChatRouter = require('./api/meetingChat');
+const complaintsRouter = require('./api/complaints');
 app.use('/api/auth', authRouter);
 app.use('/api/auth', sessionRouter);
 app.use('/api/visitors', visitorsRouter);
@@ -75,6 +77,8 @@ app.use('/api/ocr', ocrRouter);
 app.use('/api/vehicle', vehicleRouter);
 app.use('/api/maintenance', maintenanceRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/meeting-chat', meetingChatRouter);
+app.use('/api/complaints', complaintsRouter);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Protected route

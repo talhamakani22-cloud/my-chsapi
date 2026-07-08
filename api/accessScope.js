@@ -4,7 +4,7 @@ function escapeRegex(value = '') {
 
 function extractFlatNumberFromEmail(email = '') {
   const normalized = String(email).trim().toLowerCase();
-  const match = normalized.match(/^[a-z]+(?:[._-]?[a-z]+)*(\d+)@chs\.com$/i);
+  const match = normalized.match(/(\d+)@[^@]+$/i);
   return match ? match[1] : '';
 }
 
@@ -56,4 +56,5 @@ function buildFlatScopedRegex(flatNumber = '') {
 module.exports = {
   getAccessScope,
   buildFlatScopedRegex,
+  extractFlatNumberFromEmail,
 };

@@ -3,6 +3,7 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const { extractFlatNumberFromEmail } = require('./accessScope');
 
 async function verifyCollectionLogin({ collectionName, normalizedEmail, password, fallbackRole }) {
   const db = mongoose.connection && mongoose.connection.db;
@@ -402,6 +403,225 @@ router.post('/reset-password', async (req, res) => {
   } catch (err) {
     console.error('[RESET PASSWORD ERROR]', err);
     return res.status(500).json({ success: false, message: 'Failed to reset password.' });
+  }
+});
+
+router.get('/profile', async (req, res) => {
+  const sessionUser = req?.session?.user;
+  if (!sessionUser?.email) {
+    return res.status(401).json({ success: false, message: 'Please log in first.' });
+  }
+
+  try {
+    const { collectionName, role } = getAuthTarget(String(sessionUser.loginType || 'resident'));
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const collection = db.collection(collectionName);
+    const familyCollection = db.collection('family_detail');
+    const vehicleCollection = db.collection('vehicle_registration');
+    const email = String(sessionUser.email || '').toLowerCase();
+    const record = await collection.findOne({ email });
+    const userDoc = record?.userId ? await User.findById(record.userId) : await User.findOne({ email, role });
+
+    const flatNumber = String(extractFlatNumberFromEmail(email) || '').trim();
+    const residentName = String(userDoc?.name || record?.name || record?.username || '').trim();
+    const [familyRecord, vehicleRecords] = flatNumber
+      ? await Promise.all([
+          familyCollection.findOne({ flatNumber, isActive: { $ne: false } }),
+          vehicleCollection.find({ flatNumber, }).sort({ uploadedAt: -1 }).toArray(),
+        ])
+      : [null, []];
+
+    if (!userDoc) {
+      return res.status(404).json({ success: false, message: 'Profile not found.' });
+    }
+
+    return res.json({
+      success: true,
+      profile: {
+        name: residentName,
+        email: userDoc.email || email,
+        role: userDoc.role || role,
+        loginType: String(sessionUser.loginType || '').toLowerCase(),
+        flatNumber,
+        signupDetails: {
+          username: String(record?.username || '').trim(),
+          accountName: residentName,
+        },
+        familyDetails: familyRecord ? {
+          id: String(familyRecord._id || ''),
+          residentName: String(familyRecord.residentName || '').trim(),
+          flatNumber: String(familyRecord.flatNumber || '').trim(),
+          familyMembers: Array.isArray(familyRecord.familyMembers) ? familyRecord.familyMembers : [],
+          fileName: familyRecord.fileName || '',
+          fileUrl: familyRecord.fileUrl || '',
+          uploadedAt: familyRecord.uploadedAt || null,
+        } : null,
+        vehicleDetails: Array.isArray(vehicleRecords) ? vehicleRecords.map((vehicle) => ({
+          id: String(vehicle._id || ''),
+          ownerName: String(vehicle.ownerName || '').trim(),
+          ownerCnic: String(vehicle.ownerCnic || '').trim(),
+          flatNumber: String(vehicle.flatNumber || '').trim(),
+          vehicleType: String(vehicle.vehicleType || '').trim(),
+          vehicleNumber: String(vehicle.vehicleNumber || '').trim(),
+          address: String(vehicle.address || '').trim(),
+          registrationDate: String(vehicle.registrationDate || '').trim(),
+          fileName: vehicle.fileName || '',
+          fileUrl: vehicle.fileUrl || '',
+          uploadedAt: vehicle.uploadedAt || null,
+        })) : [],
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to fetch profile.' });
+  }
+});
+
+router.put('/profile', async (req, res) => {
+  const sessionUser = req?.session?.user;
+  if (!sessionUser?.email) {
+    return res.status(401).json({ success: false, message: 'Please log in first.' });
+  }
+
+  const displayName = String(req.body.displayName || '').trim();
+  const residentName = String(req.body.residentName || displayName || '').trim();
+  const flatNumber = String(req.body.flatNumber || '').trim();
+  const familyMembers = Array.isArray(req.body.familyMembers) ? req.body.familyMembers : [];
+  const vehicleDetails = Array.isArray(req.body.vehicleDetails) ? req.body.vehicleDetails : [];
+
+  if (!displayName && !residentName && !flatNumber && !familyMembers.length && !vehicleDetails.length) {
+    return res.status(400).json({ success: false, message: 'Profile data is required.' });
+  }
+
+  try {
+    const loginType = String(sessionUser.loginType || 'resident').toLowerCase();
+    const { collectionName, role } = getAuthTarget(loginType);
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const email = String(sessionUser.email || '').toLowerCase();
+    const collection = db.collection(collectionName);
+    const familyCollection = db.collection('family_detail');
+    const vehicleCollection = db.collection('vehicle_registration');
+    const userRecord = await collection.findOne({ email });
+    const userDoc = userRecord?.userId ? await User.findById(userRecord.userId) : await User.findOne({ email, role });
+
+    if (!userDoc) {
+      return res.status(404).json({ success: false, message: 'Profile not found.' });
+    }
+
+    const nextName = displayName || residentName || userDoc.name || '';
+    userDoc.name = nextName;
+    userDoc.updatedAt = new Date();
+    await userDoc.save();
+
+    await collection.updateOne(
+      { email },
+      {
+        $set: {
+          name: nextName,
+          username: nextName,
+          userId: userDoc._id,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          createdAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+
+    const residentFlatNumber = flatNumber || String(email.match(/(\d+)@chs\.com$/i)?.[1] || '').trim();
+
+    if (loginType === 'resident' && residentFlatNumber) {
+      if (residentName || familyMembers.length || req.body.familyRecordId) {
+        const familyPayload = {
+          residentName: residentName || nextName,
+          flatNumber: residentFlatNumber,
+          familyMembers,
+          isActive: true,
+          updatedAt: new Date(),
+        };
+
+        if (req.body.familyRecordId && mongoose.Types.ObjectId.isValid(String(req.body.familyRecordId))) {
+          await familyCollection.updateOne(
+            { _id: new mongoose.Types.ObjectId(String(req.body.familyRecordId)) },
+            { $set: familyPayload, $setOnInsert: { createdAt: new Date() } },
+            { upsert: true }
+          );
+        } else {
+          await familyCollection.updateOne(
+            { flatNumber: residentFlatNumber, isActive: { $ne: false } },
+            { $set: familyPayload, $setOnInsert: { createdAt: new Date() } },
+            { upsert: true }
+          );
+        }
+      }
+
+      if (vehicleDetails.length) {
+        for (const vehicle of vehicleDetails) {
+          const ownerName = String(vehicle.ownerName || nextName).trim();
+          const ownerCnic = String(vehicle.ownerCnic || '').trim();
+          const vehicleFlatNumber = String(vehicle.flatNumber || residentFlatNumber).trim();
+          const vehicleType = String(vehicle.vehicleType || '').trim();
+          const vehicleNumber = String(vehicle.vehicleNumber || '').trim().toUpperCase();
+          if (!ownerName || !vehicleFlatNumber || !vehicleType || !vehicleNumber) {
+            continue;
+          }
+
+          const vehiclePayload = {
+            ownerName,
+            ownerCnic,
+            flatNumber: vehicleFlatNumber,
+            vehicleType,
+            vehicleNumber,
+            address: String(vehicle.address || '').trim(),
+            registrationDate: String(vehicle.registrationDate || '').trim(),
+            updatedAt: new Date(),
+            isActive: true,
+          };
+
+          if (vehicle.id && mongoose.Types.ObjectId.isValid(String(vehicle.id))) {
+            await vehicleCollection.updateOne(
+              { _id: new mongoose.Types.ObjectId(String(vehicle.id)) },
+              { $set: vehiclePayload, $setOnInsert: { createdAt: new Date() } },
+              { upsert: true }
+            );
+          } else {
+            await vehicleCollection.updateOne(
+              { flatNumber: vehicleFlatNumber, vehicleNumber, isActive: { $ne: false } },
+              { $set: vehiclePayload, $setOnInsert: { createdAt: new Date() } },
+              { upsert: true }
+            );
+          }
+        }
+      }
+    }
+
+    req.session.user = {
+      ...sessionUser,
+      email,
+      name: nextName,
+    };
+
+    return res.json({
+      success: true,
+      message: 'Profile updated successfully.',
+      profile: {
+        name: nextName,
+        email,
+        role: userDoc.role || role,
+        loginType,
+        flatNumber: residentFlatNumber,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to update profile.' });
   }
 });
 

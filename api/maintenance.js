@@ -4,18 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const User = require('../models/User');
+const { extractFlatNumberFromEmail } = require('./accessScope');
 
 const router = express.Router();
 const RECEIPTS_COLLECTION = 'maintenance_receipts';
 const INBOX_COLLECTION = 'maintenance_inbox';
 const E_RECIPTS_COLLECTION = 'e reciept';
 const FAMILY_COLLECTION = 'family_detail';
-
-function extractFlatNumberFromEmail(email = '') {
-  const normalized = String(email || '').trim().toLowerCase();
-  const match = normalized.match(/^[a-z]+(?:[._-]?[a-z]+)*(\d+)@chs\.com$/i);
-  return match ? match[1] : '';
-}
 
 function normalizeFlatNumber(flatNumber = '') {
   const value = String(flatNumber || '').trim();

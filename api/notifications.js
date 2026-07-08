@@ -282,4 +282,108 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.put('/:id', async (req, res) => {
+  const sessionUser = req?.session?.user;
+  if (!sessionUser?.email) {
+    return res.status(401).json({ success: false, message: 'Please log in first.' });
+  }
+
+  if (!canCreateNotification(sessionUser)) {
+    return res.status(403).json({ success: false, message: 'Only committee head can edit notifications.' });
+  }
+
+  const notificationId = String(req.params.id || '').trim();
+  if (!notificationId || !mongoose.Types.ObjectId.isValid(notificationId)) {
+    return res.status(400).json({ success: false, message: 'Invalid notification id.' });
+  }
+
+  const title = String(req.body.title || '').trim();
+  const message = String(req.body.message || '').trim();
+  const target = normalizeTarget(req.body.target);
+
+  if (!title || !message) {
+    return res.status(400).json({ success: false, message: 'Title and message are required.' });
+  }
+
+  try {
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const result = await db.collection(NOTIFICATIONS_COLLECTION).findOneAndUpdate(
+      {
+        _id: new mongoose.Types.ObjectId(notificationId),
+        isActive: { $ne: false },
+      },
+      {
+        $set: {
+          title,
+          message,
+          target,
+          updatedAt: new Date(),
+        },
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!result) {
+      return res.status(404).json({ success: false, message: 'Notification not found.' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Notification updated successfully.',
+      notification: result,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to update notification.' });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  const sessionUser = req?.session?.user;
+  if (!sessionUser?.email) {
+    return res.status(401).json({ success: false, message: 'Please log in first.' });
+  }
+
+  if (!canCreateNotification(sessionUser)) {
+    return res.status(403).json({ success: false, message: 'Only committee head can delete notifications.' });
+  }
+
+  const notificationId = String(req.params.id || '').trim();
+  if (!notificationId || !mongoose.Types.ObjectId.isValid(notificationId)) {
+    return res.status(400).json({ success: false, message: 'Invalid notification id.' });
+  }
+
+  try {
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const result = await db.collection(NOTIFICATIONS_COLLECTION).updateOne(
+      {
+        _id: new mongoose.Types.ObjectId(notificationId),
+        isActive: { $ne: false },
+      },
+      {
+        $set: {
+          isActive: false,
+          updatedAt: new Date(),
+          deletedAt: new Date(),
+        },
+      }
+    );
+
+    if (!result.matchedCount) {
+      return res.status(404).json({ success: false, message: 'Notification not found.' });
+    }
+
+    return res.json({ success: true, message: 'Notification deleted successfully.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to delete notification.' });
+  }
+});
+
 module.exports = router;
