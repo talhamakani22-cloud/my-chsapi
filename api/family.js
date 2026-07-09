@@ -130,6 +130,9 @@ router.get('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
+    const putPayload = req.body && typeof req.body === 'object' ? req.body : {};
+    console.log('[Family PUT body]', putPayload);
+
     const access = getAccessScope(req);
     if (!access.allowed) {
       return res.status(access.status).json({ success: false, message: access.message });

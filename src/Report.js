@@ -129,6 +129,12 @@ function Report({ onBackToDashboard, onRequireLogin }) {
       if (endDate) params.append('endDate', endDate);
       const res = await fetch(`${API_BASE_URL}/api/visitors?${params.toString()}`, { credentials: 'include' });
       const data = await res.json();
+      if (res.status === 401 || res.status === 403) {
+        if (onRequireLogin) onRequireLogin();
+        setVisitors([]);
+        setError(data.message || 'Please log in to access this data.');
+        return;
+      }
       if (data.success) {
         setVisitors(data.visitors);
       } else {
@@ -138,7 +144,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
       setError('Failed to fetch visitors');
     }
     setLoading(false);
-  }, [searchQuery, startDate, endDate]);
+  }, [searchQuery, startDate, endDate, onRequireLogin]);
 
   const getMonthKey = (visitor) => {
     // Group by registration/entry time first so monthly report reflects actual visit month.
