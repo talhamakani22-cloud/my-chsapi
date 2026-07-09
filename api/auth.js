@@ -5,6 +5,106 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { extractFlatNumberFromEmail } = require('./accessScope');
 
+const FAMILY_MEMBER_LIMIT = 15;
+
+function normalizeCnicKey(value = '') {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length === 13 ? digits : '';
+}
+
+function sanitizeFamilyMember(member = {}) {
+  return {
+    memberName: String(member.memberName || member.name || member.member || '').trim(),
+    relation: String(member.relation || '').trim(),
+    cnic: String(member.cnic || '').trim(),
+    phone: String(member.phone || '').trim(),
+  };
+}
+
+function sanitizeFamilyMembers(rawMembers = []) {
+  return (Array.isArray(rawMembers) ? rawMembers : [])
+    .map(sanitizeFamilyMember)
+    .filter((member) => member.memberName || member.relation || member.cnic || member.phone);
+}
+
+function findDuplicateCnic(members = []) {
+  const seen = new Set();
+  for (const member of members) {
+    const key = normalizeCnicKey(member.cnic);
+    if (!key) continue;
+    if (seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+}
+
+function uniqueMembersByCnic(members = []) {
+  const result = [];
+  const seen = new Set();
+  for (const member of members) {
+    const key = normalizeCnicKey(member.cnic);
+    if (!key) {
+      result.push(member);
+      continue;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(member);
+  }
+  return result;
+}
+
+function mergeFamilyMembers(existingMembers = [], incomingMembers = []) {
+  const existing = uniqueMembersByCnic(sanitizeFamilyMembers(existingMembers));
+  const incoming = sanitizeFamilyMembers(incomingMembers);
+
+  if (!incoming.length) {
+    return existing;
+  }
+
+  if (findDuplicateCnic(incoming)) {
+    throw new Error('Duplicate CNIC is not allowed. Please edit the existing member instead.');
+  }
+
+  const byCnic = new Map();
+  const merged = [];
+
+  for (const member of existing) {
+    const key = normalizeCnicKey(member.cnic);
+    if (key) {
+      byCnic.set(key, merged.length);
+    }
+    merged.push(member);
+  }
+
+  for (const member of incoming) {
+    const key = normalizeCnicKey(member.cnic);
+    if (!member.memberName || !member.relation || !key) {
+      throw new Error('Each family member must include member name, relation, and valid CNIC.');
+    }
+
+    if (byCnic.has(key)) {
+      merged[byCnic.get(key)] = {
+        ...merged[byCnic.get(key)],
+        ...member,
+      };
+    } else {
+      byCnic.set(key, merged.length);
+      merged.push(member);
+    }
+  }
+
+  if (merged.length > FAMILY_MEMBER_LIMIT) {
+    throw new Error(`Maximum ${FAMILY_MEMBER_LIMIT} family members are allowed per flat.`);
+  }
+
+  if (findDuplicateCnic(merged)) {
+    throw new Error('Duplicate CNIC is not allowed in family details.');
+  }
+
+  return merged;
+}
+
 async function verifyCollectionLogin({ collectionName, normalizedEmail, password, fallbackRole }) {
   const db = mongoose.connection && mongoose.connection.db;
   if (!db) {
@@ -540,10 +640,20 @@ router.put('/profile', async (req, res) => {
 
     if (loginType === 'resident' && residentFlatNumber) {
       if (residentName || familyMembers.length || req.body.familyRecordId) {
+        const existingFamilyRecord = await familyCollection.findOne({
+          flatNumber: residentFlatNumber,
+          isActive: { $ne: false },
+        });
+
+        const mergedFamilyMembers = mergeFamilyMembers(
+          existingFamilyRecord?.familyMembers || [],
+          familyMembers
+        );
+
         const familyPayload = {
           residentName: residentName || nextName,
           flatNumber: residentFlatNumber,
-          familyMembers,
+          familyMembers: mergedFamilyMembers,
           isActive: true,
           updatedAt: new Date(),
         };

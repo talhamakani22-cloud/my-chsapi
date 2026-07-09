@@ -16,11 +16,6 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const pdfUploadDir = path.join(uploadsRoot, 'cnic-pdfs');
-if (!fs.existsSync(pdfUploadDir)) {
-  fs.mkdirSync(pdfUploadDir, { recursive: true });
-}
-
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
   filename: (_req, file, cb) => {
@@ -46,29 +41,23 @@ const upload = multer({
   },
 });
 
-const pdfStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, pdfUploadDir),
-  filename: (_req, file, cb) => {
-    const safeBase = path
-      .basename(file.originalname || 'cnic.pdf', path.extname(file.originalname || '.pdf'))
-      .replace(/[^a-zA-Z0-9_-]/g, '_')
-      .slice(0, 60);
-    cb(null, `${Date.now()}-${safeBase || 'cnic'}.pdf`);
-  },
-});
+const FAMILY_MEMBER_LIMIT = 15;
 
-const pdfUpload = multer({
-  storage: pdfStorage,
-  limits: { fileSize: 20 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const isPdfMime = file.mimetype === 'application/pdf';
-    const isPdfExt = path.extname(file.originalname || '').toLowerCase() === '.pdf';
-    if (!isPdfMime && !isPdfExt) {
-      return cb(new Error('Only PDF files are allowed.'));
-    }
-    return cb(null, true);
-  },
-});
+const normalizeCnicKey = (value = '') => {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length === 13 ? digits : '';
+};
+
+const hasDuplicateCnic = (members = []) => {
+  const seen = new Set();
+  for (const member of members) {
+    const key = normalizeCnicKey(member.cnic);
+    if (!key) continue;
+    if (seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+};
 
 const normalizeFamilyMember = (member = {}) => ({
   memberName: String(member.memberName || member.name || member.member || '').trim(),
@@ -169,6 +158,20 @@ router.put('/:id', async (req, res) => {
       .map(normalizeFamilyMember)
       .filter((member) => member.memberName || member.relation || member.cnic || member.phone);
 
+    if (sanitizedMembers.length > FAMILY_MEMBER_LIMIT) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum ${FAMILY_MEMBER_LIMIT} family members are allowed per flat.`,
+      });
+    }
+
+    if (hasDuplicateCnic(sanitizedMembers)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Duplicate CNIC is not allowed. Please edit the existing member instead.',
+      });
+    }
+
     const selector = { _id: new mongoose.Types.ObjectId(recordId) };
     if (access.scope === 'resident') {
       selector.flatNumber = { $regex: buildFlatScopedRegex(access.flatNumber) };
@@ -266,6 +269,20 @@ router.post('/upload-cnic-image', upload.single('cnicImage'), async (req, res) =
       uploadedAt: new Date(),
     };
 
+    if (payload.familyMembers.length > FAMILY_MEMBER_LIMIT) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum ${FAMILY_MEMBER_LIMIT} family members are allowed per flat.`,
+      });
+    }
+
+    if (hasDuplicateCnic(payload.familyMembers)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Duplicate CNIC is not allowed. Please edit the existing member instead.',
+      });
+    }
+
     const result = await db.collection(FAMILY_COLLECTION).insertOne(payload);
 
     console.log('[✅ Family CNIC Image Uploaded to MongoDB]', {
@@ -287,110 +304,6 @@ router.post('/upload-cnic-image', upload.single('cnicImage'), async (req, res) =
     });
   } catch (err) {
     console.error('[❌ Family Upload Error]', {
-      error: err.message,
-      stack: err.stack,
-      timestamp: new Date().toISOString()
-    });
-    return res.status(500).json({ success: false, message: err.message || 'Upload failed.' });
-  }
-});
-
-router.post('/upload-cnic-pdf', pdfUpload.single('cnicPdf'), async (req, res) => {
-  const cnicPdfBase64 = String(req.body.cnicPdfBase64 || '').trim();
-  const cnicPdfName = String(req.body.cnicPdfName || 'CNIC.pdf').trim() || 'CNIC.pdf';
-  const cnicPdfMimeType = String(req.body.cnicPdfMimeType || 'application/pdf').trim() || 'application/pdf';
-
-  if (!req.file && !cnicPdfBase64) {
-    return res.status(400).json({ success: false, message: 'No CNIC PDF uploaded.' });
-  }
-
-  const residentName = String(req.body.residentName || '').trim();
-  const flatNumber = String(req.body.flatNumber || '').trim();
-  const familyMembersRaw = Array.isArray(req.body.familyMembers)
-    ? req.body.familyMembers
-    : String(req.body.familyMembers || '[]');
-
-  if (!residentName || !flatNumber) {
-    return res.status(400).json({
-      success: false,
-      message: 'Resident name and flat number are required for CNIC PDF upload.',
-    });
-  }
-
-  let familyMembers = [];
-  if (Array.isArray(familyMembersRaw)) {
-    familyMembers = familyMembersRaw;
-  } else {
-    try {
-      const parsed = JSON.parse(familyMembersRaw);
-      if (Array.isArray(parsed)) {
-        familyMembers = parsed;
-      }
-    } catch {
-      familyMembers = [];
-    }
-  }
-
-  const safeBase = path
-    .basename(cnicPdfName, path.extname(cnicPdfName))
-    .replace(/[^a-zA-Z0-9_-]/g, '_')
-    .slice(0, 60);
-  const storedFileName = req.file?.filename || `${Date.now()}-${safeBase || 'cnic'}.pdf`;
-  const relativePath = `/uploads/cnic-pdfs/${storedFileName}`;
-  const absoluteUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
-
-  try {
-    const db = mongoose.connection && mongoose.connection.db;
-    if (!db) {
-      throw new Error('Database connection is not ready.');
-    }
-
-    if (!req.file) {
-      const normalizedBase64 = cnicPdfBase64
-        .replace(/^data:application\/pdf;base64,/, '')
-        .replace(/^data:[^;]+;base64,/, '');
-      const fileBuffer = Buffer.from(normalizedBase64, 'base64');
-      if (!fileBuffer.length) {
-        return res.status(400).json({ success: false, message: 'Uploaded CNIC PDF is empty.' });
-      }
-
-      fs.writeFileSync(path.join(pdfUploadDir, storedFileName), fileBuffer);
-    }
-
-    const payload = {
-      residentName,
-      flatNumber,
-      familyMembers: familyMembers.map(normalizeFamilyMember),
-      fileName: req.file?.originalname || cnicPdfName,
-      storedFileName,
-      mimeType: req.file?.mimetype || cnicPdfMimeType,
-      size: req.file?.size || Buffer.byteLength(cnicPdfBase64, 'base64'),
-      filePath: relativePath,
-      fileUrl: absoluteUrl,
-      uploadedAt: new Date(),
-    };
-
-    const result = await db.collection(FAMILY_COLLECTION).insertOne(payload);
-
-    console.log('[✅ Family CNIC PDF Uploaded to MongoDB]', {
-      id: result.insertedId,
-      residentName: payload.residentName,
-      flatNumber: payload.flatNumber,
-      fileName: payload.fileName,
-      uploadedAt: payload.uploadedAt,
-      timestamp: new Date().toISOString()
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: 'CNIC PDF uploaded successfully.',
-      upload: {
-        id: result.insertedId,
-        ...payload,
-      },
-    });
-  } catch (err) {
-    console.error('[❌ Family PDF Upload Error]', {
       error: err.message,
       stack: err.stack,
       timestamp: new Date().toISOString()

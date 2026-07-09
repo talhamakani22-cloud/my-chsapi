@@ -72,6 +72,7 @@ const maintenanceRouter = require('./api/maintenance');
 const notificationsRouter = require('./api/notifications');
 const meetingChatRouter = require('./api/meetingChat');
 const complaintsRouter = require('./api/complaints');
+const documentsRouter = require('./api/documents');
 app.use('/api/auth', authRouter);
 app.use('/api/auth', sessionRouter);
 app.use('/api/visitors', visitorsRouter);
@@ -82,6 +83,7 @@ app.use('/api/maintenance', maintenanceRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/meeting-chat', meetingChatRouter);
 app.use('/api/complaints', complaintsRouter);
+app.use('/api/documents', documentsRouter);
 app.use('/uploads', express.static(uploadsRoot));
 
 // Protected route

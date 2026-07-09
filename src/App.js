@@ -6,6 +6,7 @@ import FamilyDetails from './FamilyDetails';
 import VehicleRegistration from './VehicleRegistration';
 import ERecipets from './ERecipets';
 import ComplaintTracking from './ComplaintTracking';
+import Documents from './Documents';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
 
@@ -28,6 +29,7 @@ function App() {
       onNavigateToFamilyDetails={() => canAccessScreen('family-details') && setScreen('family-details')}
       onNavigateToVehicleRegistration={() => canAccessScreen('vehicle-registration') && setScreen('vehicle-registration')}
       onNavigateToERecipets={() => canAccessScreen('e-recipets') && setScreen('e-recipets')}
+      onNavigateToDocuments={() => canAccessScreen('documents') && setScreen('documents')}
       onNavigateToComplaintTracking={() => canAccessScreen('complaint-tracking') && setScreen('complaint-tracking')}
       sessionUser={sessionUser}
       onLogout={handleLogout}
@@ -125,6 +127,13 @@ function App() {
       return renderDashboard();
     }
     return <ERecipets onBackToDashboard={() => setScreen('dashboard')} onRequireLogin={handleLogout} />;
+  }
+
+  if (screen === 'documents') {
+    if (!canAccessScreen('documents')) {
+      return renderDashboard();
+    }
+    return <Documents onBackToDashboard={() => setScreen('dashboard')} onRequireLogin={handleLogout} />;
   }
 
   if (screen === 'complaint-tracking') {

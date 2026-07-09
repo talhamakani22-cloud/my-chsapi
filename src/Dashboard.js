@@ -3,7 +3,7 @@ import './Dashboard.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
 
-function Dashboard({ onNavigateToReport, onNavigateToFamilyDetails, onNavigateToVehicleRegistration, onNavigateToERecipets, onNavigateToComplaintTracking, sessionUser, onLogout }) {
+function Dashboard({ onNavigateToReport, onNavigateToFamilyDetails, onNavigateToVehicleRegistration, onNavigateToERecipets, onNavigateToDocuments, onNavigateToComplaintTracking, sessionUser, onLogout }) {
   const loginType = String(sessionUser?.loginType || '').toLowerCase().trim().replace(/[-_\s]+/g, '');
   const isReception = loginType === 'reception' || loginType === 'receptiondesk';
   const [visitors, setVisitors] = useState([]);
@@ -261,6 +261,11 @@ function Dashboard({ onNavigateToReport, onNavigateToFamilyDetails, onNavigateTo
         {!isReception && (
           <button className="action-btn primary" onClick={onNavigateToERecipets}>
             E Recipets
+          </button>
+        )}
+        {!isReception && (
+          <button className="action-btn primary" onClick={onNavigateToDocuments}>
+            Documents
           </button>
         )}
         <button className="action-btn primary" onClick={onNavigateToReport}>

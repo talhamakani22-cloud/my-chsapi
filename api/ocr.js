@@ -32,11 +32,32 @@ function handleImageUpload(req, res, next) {
 
 // POST /api/ocr - Accepts an image and returns extracted text
 router.post('/', handleImageUpload, async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No image file uploaded.' });
-  }
   try {
-    const { buffer } = req.file;
+    let buffer = req.file?.buffer;
+
+    if (!buffer) {
+      const imageBase64 = String(req.body?.imageBase64 || '').trim();
+      if (!imageBase64) {
+        return res.status(400).json({ error: 'No image file uploaded.' });
+      }
+
+      const normalizedBase64 = imageBase64
+        .replace(/^data:image\/[a-z]+;base64,/, '')
+        .replace(/^data:[^;]+;base64,/, '');
+      const decoded = Buffer.from(normalizedBase64, 'base64');
+      if (!decoded.length) {
+        return res.status(400).json({ error: 'Uploaded image is empty.' });
+      }
+
+      if (decoded.length > OCR_MAX_FILE_SIZE_BYTES) {
+        return res.status(413).json({
+          error: `Image too large. Please upload an image under ${OCR_MAX_FILE_SIZE_MB}MB.`,
+        });
+      }
+
+      buffer = decoded;
+    }
+
     const result = await Tesseract.recognize(buffer, 'eng');
     res.json({ text: result.data.text });
   } catch (error) {

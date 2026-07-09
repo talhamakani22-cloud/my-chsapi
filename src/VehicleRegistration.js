@@ -4,14 +4,6 @@ import './VehicleRegistration.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
 
-const buildFileUrl = (value) => {
-  const source = String(value || '').trim();
-  if (!source) return '';
-  if (/^https?:\/\//i.test(source)) return source;
-  if (source.startsWith('/')) return `${API_BASE_URL}${source}`;
-  return `${API_BASE_URL}/${source}`;
-};
-
 function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
   const [records, setRecords] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -165,13 +157,12 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
                 <td>${record.vehicleType || '-'}</td>
                 <td>${record.vehicleNumber || '-'}</td>
                 <td>${record.registrationDate || '-'}</td>
-                <td>${record.fileName || '-'}</td>
                 <td>${record.uploadedAt ? new Date(record.uploadedAt).toLocaleString() : '-'}</td>
               </tr>
             `
           )
           .join('')
-      : '<tr><td colspan="8" style="text-align:center; padding:16px;">No records found</td></tr>';
+      : '<tr><td colspan="7" style="text-align:center; padding:16px;">No records found</td></tr>';
 
     const printedAt = new Date().toLocaleString();
 
@@ -202,7 +193,6 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
                 <th>Vehicle Type</th>
                 <th>Vehicle Number</th>
                 <th>Registration Date</th>
-                <th>Card PDF</th>
                 <th>Uploaded At</th>
               </tr>
             </thead>
@@ -314,17 +304,12 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
                 <th>Vehicle Type</th>
                 <th>Vehicle Number</th>
                 <th>Registration Date</th>
-                <th>Card PDF</th>
                 <th>Uploaded At</th>
               </tr>
             </thead>
             <tbody>
               {filteredRecords.length > 0 ? (
                 filteredRecords.map((record) => (
-                  (() => {
-                    const fileUrl = buildFileUrl(record.filePath || record.fileUrl);
-                    const fileAvailable = record.fileAvailable !== false;
-                    return (
                   <tr key={String(record._id || `${record.vehicleNumber}-${record.uploadedAt}`)}>
                     <td className="name-en-cell">{record.ownerName || '-'}</td>
                     <td className="emirates-id-cell">{record.ownerCnic || '-'}</td>
@@ -332,27 +317,12 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
                     <td><span className="nationality-badge">{record.vehicleType || '-'}</span></td>
                     <td><strong>{record.vehicleNumber || '-'}</strong></td>
                     <td>{record.registrationDate || '-'}</td>
-                    <td>
-                      {fileUrl ? (
-                        fileAvailable ? (
-                          <a href={fileUrl} target="_blank" rel="noreferrer" className="file-link">
-                            {record.fileName || 'Open PDF'}
-                          </a>
-                        ) : (
-                          <span className="file-link" style={{ color: '#fca5a5' }}>File missing</span>
-                        )
-                      ) : (
-                        '-'
-                      )}
-                    </td>
                     <td>{record.uploadedAt ? new Date(record.uploadedAt).toLocaleString() : '-'}</td>
                   </tr>
-                    );
-                  })()
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" className="no-results">No vehicle records found matching your criteria</td>
+                  <td colSpan="7" className="no-results">No vehicle records found matching your criteria</td>
                 </tr>
               )}
             </tbody>
