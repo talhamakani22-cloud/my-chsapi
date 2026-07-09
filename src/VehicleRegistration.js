@@ -331,6 +331,9 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
       </div>
 
       <div className="report-actions">
+        <button className="action-btn export-btn" onClick={handlePrintReport}>
+          💾 Save PDF
+        </button>
         <button className="action-btn print-btn" onClick={handlePrintReport}>
           🖨️ Print Report
         </button>

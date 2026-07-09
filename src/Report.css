@@ -636,6 +636,29 @@
   text-decoration: underline;
 }
 
+.table-doc-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-save-btn {
+  border: 1px solid #d1dbe7;
+  border-radius: 8px;
+  padding: 5px 10px;
+  background: #f7fafc;
+  color: #0f2233;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.table-save-btn:hover {
+  background: #edf2f7;
+  border-color: #58aee6;
+}
+
 .no-results {
   text-align: center;
   padding: 40px 16px !important;

@@ -222,14 +222,14 @@ function Dashboard({ onNavigateToReport, onNavigateToFamilyDetails, onNavigateTo
           <h3 className="chart-title">Recent Pakistan ID Records</h3>
           <div className="visitors-table">
             <div className="table-header">
-              <span>Emirates ID</span>
+              <span>Pakstan ID</span>
               <span>Full Name (English)</span>
               <span>Gender</span>
               <span>Expiry Date</span>
             </div>
             {recentVisitors.map((visitor, index) => (
               <div className="table-row" key={index}>
-                <span className="visitor-name emirates-id">{visitor.emiratesId}</span>
+                <span className="visitor-name emirates-id">{visitor.cnicId}</span>
                 <span className="visitor-type">{visitor.fullNameEnglish || visitor.nameEn}</span>
                 <span className={`visitor-status ${visitor.gender?.toLowerCase()}`}>
                   {visitor.gender}
@@ -242,14 +242,12 @@ function Dashboard({ onNavigateToReport, onNavigateToFamilyDetails, onNavigateTo
       </div>
 
       <div className="dashboard-actions">
-        {!isReception && (
-          <button
-            className="action-btn primary"
-            onClick={onNavigateToFamilyDetails}
-          >
-            Family Details
-          </button>
-        )}
+        <button
+          className="action-btn primary"
+          onClick={onNavigateToFamilyDetails}
+        >
+          Family Details
+        </button>
         {!isReception && (
           <button
             className="action-btn primary"

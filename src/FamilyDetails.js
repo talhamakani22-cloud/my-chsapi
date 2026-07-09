@@ -3,7 +3,10 @@ import './FamilyDetails.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
 
-function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
+function FamilyDetails({
+  onBackToDashboard,
+  onRequireLogin,
+}) {
   const [records, setRecords] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
@@ -180,6 +183,71 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
     setLoading(false);
   };
 
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+    if (!printWindow) return;
+
+    const rowsHtml = records.length
+      ? records
+          .map((record) => {
+            const members = Array.isArray(record.familyMembers) ? record.familyMembers : [];
+            return `
+              <tr>
+                <td>${record.residentName || '-'}</td>
+                <td>${record.flatNumber || '-'}</td>
+                <td>${members.length}</td>
+                <td>${record.uploadedAt ? new Date(record.uploadedAt).toLocaleString() : '-'}</td>
+                <td>${record.isActive !== false ? 'Active' : 'Inactive'}</td>
+              </tr>
+            `;
+          })
+          .join('')
+      : '<tr><td colspan="5" style="text-align:center; padding:16px;">No records found</td></tr>';
+
+    const printedAt = new Date().toLocaleString();
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Family Details Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+            h1 { margin: 0 0 8px 0; font-size: 22px; }
+            .meta { margin-bottom: 16px; font-size: 13px; color: #444; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f2f7fb; }
+          </style>
+        </head>
+        <body>
+          <h1>Family Details Report</h1>
+          <div class="meta">Printed: ${printedAt}</div>
+          <div class="meta">Records: ${records.length}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Resident Name</th>
+                <th>Flat Number</th>
+                <th>Members</th>
+                <th>Uploaded At</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <script>
+            window.onload = function () {
+              window.print();
+              window.onafterprint = function () { window.close(); };
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="family-report-container">
       <div className="bg-shapes">
@@ -281,6 +349,12 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="family-report-actions">
+        <button className="family-print-btn" onClick={handlePrintReport}>💾 Save PDF</button>
+        <button className="family-print-btn" onClick={handlePrintReport}>🖨️ Print Report</button>
+        <button className="family-back-btn" onClick={onBackToDashboard}>Back to Dashboard</button>
       </div>
 
       {editingRecord && (

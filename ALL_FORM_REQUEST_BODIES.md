@@ -39,7 +39,7 @@ Endpoint: POST /api/auth/reset-password
 Endpoint: POST /api/visitors
 
 {
-  "emiratesId": "12345-1234567-1",
+  "cnicId": "12345-1234567-1",
   "fullNameEnglish": "Amjad Ali",
   "fatherName": "Ali Akbar",
   "nationality": "Pakistan",
@@ -51,7 +51,7 @@ Endpoint: POST /api/visitors
   "issueDate": "2020-01-01",
   "expiryDate": "2030-01-01",
   "purposeOfVisit": "Meeting",
-  "remark": "New",
+  "remark": "Checked In",
   "platform": "expo",
   "cnicImageBase64": "BASE64_IMAGE_DATA",
   "cnicImageName": "cnic.jpg",

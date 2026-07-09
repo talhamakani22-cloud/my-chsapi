@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import './Report.css';
 import './ComplaintTracking.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
@@ -140,17 +141,99 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
     return dt.toLocaleString();
   };
 
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+    if (!printWindow) return;
+
+    const rowsHtml = rows.length
+      ? rows
+          .map((row) => {
+            const progress = statusProgress(row.status);
+            return `
+              <tr>
+                <td>${row.ticketNo || '-'}</td>
+                <td>${row.flatNumber || '-'}</td>
+                <td>${row.complaintType || 'General'}</td>
+                <td>${row.status || '-'}</td>
+                <td>${progress}%</td>
+                <td>${row.statusNote || 'No note added yet.'}</td>
+                <td>${row.sender?.email || '-'}</td>
+                <td>${formatDateTime(row.createdAt)}</td>
+                <td>${formatDateTime(row.updatedAt)}</td>
+              </tr>
+            `;
+          })
+          .join('')
+      : '<tr><td colspan="9" style="text-align:center; padding:16px;">No complaints found</td></tr>';
+
+    const printedAt = new Date().toLocaleString();
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Complaint Tracking Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+            h1 { margin: 0 0 8px 0; font-size: 22px; }
+            .meta { margin-bottom: 16px; font-size: 13px; color: #444; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+            th { background: #f2f7fb; }
+          </style>
+        </head>
+        <body>
+          <h1>Complaint Tracking Report</h1>
+          <div class="meta">Printed: ${printedAt}</div>
+          <div class="meta">Records: ${rows.length} | Status Filter: ${statusFilter} | Search: ${searchQuery || 'None'}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Ticket No</th>
+                <th>Flat Number</th>
+                <th>Complaint Type</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th>Follow-up Note</th>
+                <th>Raised By</th>
+                <th>Created</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <script>
+            window.onload = function () {
+              window.print();
+              window.onafterprint = function () { window.close(); };
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
-    <div className="complaint-tracking-page">
-      <div className="complaint-tracking-header">
-        <div>
-          <h1>Complaint Tracking</h1>
-          <p>Reception desk can follow up every ticket status in real time.</p>
-        </div>
-        <button className="complaint-back-btn" onClick={onBackToDashboard}>Back to Dashboard</button>
+    <div className="report-container">
+      <div className="bg-shapes">
+        <div className="shape shape-1" />
+        <div className="shape shape-2" />
+        <div className="shape shape-3" />
       </div>
 
-      <div className="complaint-tracking-controls">
+      <div className="report-header">
+        <div className="report-title">
+          <button className="back-btn" onClick={onBackToDashboard}>←</button>
+          <div>
+            <h1>Complaint Tracking</h1>
+            <p className="subtitle">Reception desk can follow up every ticket status in real time.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="report-content">
+        <div className="complaint-tracking-controls">
         <input
           className="complaint-search"
           placeholder="Search by ticket no, flat, type, description, status"
@@ -171,16 +254,16 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
         </select>
 
         <button className="complaint-refresh-btn" onClick={fetchComplaints}>Refresh</button>
-      </div>
+        </div>
 
-      {loading ? <div className="complaint-state-msg">Loading complaints...</div> : null}
-      {error ? <div className="complaint-state-error">{error}</div> : null}
+        {loading ? <div className="complaint-state-msg">Loading complaints...</div> : null}
+        {error ? <div className="complaint-state-error">{error}</div> : null}
 
-      <div className="complaint-tracking-list">
-        {rows.length === 0 ? (
-          <div className="complaint-state-msg">No complaints found for selected filters.</div>
-        ) : (
-          rows.map((row) => {
+        <div className="complaint-tracking-list">
+          {rows.length === 0 ? (
+            <div className="complaint-state-msg">No complaints found for selected filters.</div>
+          ) : (
+            rows.map((row) => {
             const complaintId = String(row._id || row.id || '');
             const isEditing = canManage && editingId === complaintId;
             const isExpanded = expandedId === complaintId;
@@ -189,8 +272,8 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
             const hasMedia = Boolean(mediaUrl);
             const mediaAvailable = row.mediaAvailable !== false;
             const mediaKind = String(row.mediaKind || '').toLowerCase();
-            return (
-              <div className="complaint-card" key={String(row._id || row.id || row.ticketNo || Math.random())}>
+              return (
+                <div className="complaint-card" key={String(row._id || row.id || row.ticketNo || Math.random())}>
                 <div className="complaint-card-head">
                   <div className="complaint-card-title">{row.ticketNo || 'Ticket'}</div>
                   <span className={statusBadgeClass(row.status)}>{row.status || 'Unknown'}</span>
@@ -297,10 +380,17 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
                     )}
                   </div>
                 ) : null}
-              </div>
-            );
-          })
-        )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="report-actions">
+        <button className="action-btn export-btn" onClick={handlePrintReport}>💾 Save PDF</button>
+        <button className="action-btn print-btn" onClick={handlePrintReport}>🖨️ Print Report</button>
+        <button className="action-btn back-dashboard" onClick={onBackToDashboard}>Back to Dashboard</button>
       </div>
     </div>
   );

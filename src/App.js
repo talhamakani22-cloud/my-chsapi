@@ -20,7 +20,7 @@ function App() {
 
   const canAccessScreen = (targetScreen) => {
     if (!isReceptionLogin) return true;
-    return targetScreen === 'dashboard' || targetScreen === 'report' || targetScreen === 'complaint-tracking';
+    return targetScreen === 'dashboard' || targetScreen === 'report' || targetScreen === 'family-details' || targetScreen === 'complaint-tracking';
   };
 
   const renderDashboard = () => (

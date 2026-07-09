@@ -12,9 +12,8 @@ async function seedVisitors() {
   const visitors = [
     {
       visitorId: 'VIS00001',
-      emiratesId: '784-1987-1234567-1',
+      cnicId: '784-1987-1234567-1',
       fullNameEnglish: 'John Doe',
-      fullNameArabic: 'جون دو',
       nationality: 'American',
       dateOfBirth: '1987-05-12',
       gender: 'Male',
@@ -31,9 +30,8 @@ async function seedVisitors() {
     },
     {
       visitorId: 'VIS00002',
-      emiratesId: '784-1990-7654321-2',
+      cnicId: '784-1990-7654321-2',
       fullNameEnglish: 'Jane Smith',
-      fullNameArabic: 'جين سميث',
       nationality: 'British',
       dateOfBirth: '1990-11-23',
       gender: 'Female',
@@ -50,9 +48,8 @@ async function seedVisitors() {
     },
     {
       visitorId: 'VIS00003',
-      emiratesId: '784-1990-7654321-3',
+      cnicId: '784-1990-7654321-3',
       fullNameEnglish: 'Ali',
-      fullNameArabic: 'علي',
       nationality: 'British',
       dateOfBirth: '1990-11-23',
       gender: 'Male',
@@ -69,9 +66,8 @@ async function seedVisitors() {
     },
     {
       visitorId: 'VIS00004',
-      emiratesId: '784-1985-2345678-4',
+      cnicId: '784-1985-2345678-4',
       fullNameEnglish: 'Fatima Hassan',
-      fullNameArabic: 'فاطمة حسن',
       nationality: 'UAE',
       dateOfBirth: '1985-08-22',
       gender: 'Female',
@@ -88,9 +84,8 @@ async function seedVisitors() {
     },
     {
       visitorId: 'VIS00005',
-      emiratesId: '784-1992-3456789-5',
+      cnicId: '784-1992-3456789-5',
       fullNameEnglish: 'Omar Khalid',
-      fullNameArabic: 'عمر خالد',
       nationality: 'UAE',
       dateOfBirth: '1992-03-10',
       gender: 'Male',
@@ -107,9 +102,8 @@ async function seedVisitors() {
     },
     {
       visitorId: 'VIS00006',
-      emiratesId: '784-1988-4567890-6',
+      cnicId: '784-1988-4567890-6',
       fullNameEnglish: 'Mariam Abdullah',
-      fullNameArabic: 'مريم عبدالله',
       nationality: 'UAE',
       dateOfBirth: '1988-11-28',
       gender: 'Female',
@@ -126,9 +120,8 @@ async function seedVisitors() {
     },
     {
       visitorId: 'VIS00007',
-      emiratesId: '784-1995-5678901-7',
+      cnicId: '784-1995-5678901-7',
       fullNameEnglish: 'Khalid Rashid',
-      fullNameArabic: 'خالد راشد',
       nationality: 'UAE',
       dateOfBirth: '1995-07-04',
       gender: 'Male',
@@ -145,9 +138,8 @@ async function seedVisitors() {
     },
     {
       visitorId: 'VIS00008',
-      emiratesId: '784-1982-6789012-8',
+      cnicId: '784-1982-6789012-8',
       fullNameEnglish: 'Noura Saif',
-      fullNameArabic: 'نورة سيف',
       nationality: 'UAE',
       dateOfBirth: '1982-01-19',
       gender: 'Female',
@@ -164,9 +156,8 @@ async function seedVisitors() {
     },
     {
       visitorId: 'VIS00009',
-      emiratesId: '784-1999-9999999-9',
+      cnicId: '784-1999-9999999-9',
       fullNameEnglish: 'Talha Makani',
-      fullNameArabic: 'طلحة مكانی',
       nationality: 'Pakistani',
       dateOfBirth: '1999-09-09',
       gender: 'Male',

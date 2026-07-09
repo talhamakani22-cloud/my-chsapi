@@ -41,10 +41,9 @@ router.get('/', async (req, res) => {
 
     if (search) {
       query.$or = [
-        { emiratesId: { $regex: search, $options: 'i' } },
+        { cnicId: { $regex: search, $options: 'i' } },
         { fullNameEnglish: { $regex: search, $options: 'i' } },
         { fatherName: { $regex: search, $options: 'i' } },
-        { fullNameArabic: { $regex: search, $options: 'i' } },
         { nationality: { $regex: search, $options: 'i' } },
         { countryOfStay: { $regex: search, $options: 'i' } },
         { houseNumber: { $regex: search, $options: 'i' } },
@@ -111,10 +110,9 @@ const upload = multer({
 // POST /api/visitors - Add a new visitor (supports JSON with base64 OR FormData)
 router.post('/', upload.single('cnicPdf'), async (req, res) => {
   const {
-    emiratesId,
+    cnicId,
     fullNameEnglish,
     fatherName,
-    fullNameArabic,
     nationality,
     countryOfStay,
     houseNumber,
@@ -131,15 +129,17 @@ router.post('/', upload.single('cnicPdf'), async (req, res) => {
     cnicImageMimeType
   } = req.body;
 
+  const submittedCnicId = String(cnicId || '').trim();
+
   const normalizedGender = normalizeGender(gender);
 
   // CNIC validation
-  if (!cnicPattern.test(emiratesId)) {
+  if (!cnicPattern.test(submittedCnicId)) {
     return res.status(400).json({ success: false, message: 'Invalid CNIC format. Use 12345-1234567-1.' });
   }
 
   // Required fields validation
-  if (!emiratesId || !fullNameEnglish || !fatherName || !countryOfStay || !houseNumber || !entryTime || !dateOfBirth || !normalizedGender || !issueDate || !expiryDate || !purposeOfVisit || !remark) {
+  if (!submittedCnicId || !fullNameEnglish || !fatherName || !countryOfStay || !houseNumber || !entryTime || !dateOfBirth || !normalizedGender || !issueDate || !expiryDate || !purposeOfVisit || !remark) {
     return res.status(400).json({ success: false, message: 'All fields are required.' });
   }
 
@@ -187,10 +187,9 @@ router.post('/', upload.single('cnicPdf'), async (req, res) => {
     }
 
     const visitor = new Visitor({
-      emiratesId,
+      cnicId: submittedCnicId,
       fullNameEnglish,
       fatherName,
-      fullNameArabic,
       nationality: countryOfStay || nationality,
       countryOfStay: countryOfStay || nationality,
       houseNumber,
@@ -209,7 +208,7 @@ router.post('/', upload.single('cnicPdf'), async (req, res) => {
     
     console.log('[✅ Visitor Added to MongoDB]', {
       id: visitor._id,
-      emiratesId: visitor.emiratesId,
+      cnicId: visitor.cnicId,
       fullNameEnglish: visitor.fullNameEnglish,
       nationality: visitor.nationality,
       dateOfBirth: visitor.dateOfBirth,
@@ -225,10 +224,9 @@ router.post('/', upload.single('cnicPdf'), async (req, res) => {
       message: 'Visitor added successfully',
       visitor: {
         _id: visitor._id,
-        emiratesId: visitor.emiratesId,
+        cnicId: visitor.cnicId,
         fullNameEnglish: visitor.fullNameEnglish,
         fatherName: visitor.fatherName,
-        fullNameArabic: visitor.fullNameArabic,
         nationality: visitor.nationality,
         countryOfStay: visitor.countryOfStay,
         houseNumber: visitor.houseNumber,

@@ -237,6 +237,84 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
 
   const canManageRows = scope === 'all';
 
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+    if (!printWindow) return;
+
+    const rowsHtml = filteredRows.length
+      ? filteredRows
+          .map(
+            (row) => `
+              <tr>
+                <td>${row.receiptNo || '-'}</td>
+                <td>${row.ownerName || '-'}</td>
+                <td>${row.residentName || '-'}</td>
+                <td>${row.flatNumber || '-'}</td>
+                <td>${row.receiptMonth || '-'}</td>
+                <td>PKR ${Number(row.amount || 0).toFixed(2)}</td>
+                <td>${row.status || '-'}</td>
+                <td>${row.paymentDate || '-'}</td>
+                <td>${row.note || '-'}</td>
+                <td>${buildFileUrl(row.paymentSlipPath || row.paymentSlipUrl) ? 'Available' : '-'}</td>
+                <td>PKR ${Number(row.receivedAmount || 0).toFixed(2)}</td>
+                <td>PKR ${Number(row.pendingAmount || 0).toFixed(2)}</td>
+              </tr>
+            `
+          )
+          .join('')
+      : '<tr><td colspan="12" style="text-align:center; padding:16px;">No records found</td></tr>';
+
+    const printedAt = new Date().toLocaleString();
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>E Recipets Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+            h1 { margin: 0 0 8px 0; font-size: 22px; }
+            .meta { margin-bottom: 16px; font-size: 13px; color: #444; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+            th { background: #f2f7fb; }
+          </style>
+        </head>
+        <body>
+          <h1>E Recipets Report</h1>
+          <div class="meta">Printed: ${printedAt}</div>
+          <div class="meta">Records: ${filteredRows.length}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Receipt No</th>
+                <th>Owner Name</th>
+                <th>Resident Name</th>
+                <th>Flat Number</th>
+                <th>Receipt Month</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Payment Date</th>
+                <th>Note</th>
+                <th>Slip Proof</th>
+                <th>Received Amount</th>
+                <th>Pending Amount</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <script>
+            window.onload = function () {
+              window.print();
+              window.onafterprint = function () { window.close(); };
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="report-container">
       <div className="bg-shapes">
@@ -445,6 +523,12 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="report-actions">
+        <button className="action-btn export-btn" onClick={handlePrintReport}>💾 Save PDF</button>
+        <button className="action-btn print-btn" onClick={handlePrintReport}>🖨️ Print Report</button>
+        <button className="action-btn back-dashboard" onClick={onBackToDashboard}>Back to Dashboard</button>
       </div>
     </div>
   );

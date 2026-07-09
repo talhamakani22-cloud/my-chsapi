@@ -6,9 +6,8 @@ async function addMoreVisitors() {
 
   const visitors = [
     {
-      emiratesId: '784-1980-3333333-3',
+      cnicId: '784-1980-3333333-3',
       fullNameEnglish: 'Layla Hassan Al Mazrouei',
-      fullNameArabic: 'ليلى حسن المزروعي',
       nationality: 'UAE',
       dateOfBirth: '1980-11-11',
       gender: 'Female',
@@ -16,9 +15,8 @@ async function addMoreVisitors() {
       issueDate: '2025-11-11'
     },
     {
-      emiratesId: '784-1975-4444444-4',
+      cnicId: '784-1975-4444444-4',
       fullNameEnglish: 'Yousef Khalid Al Shamsi',
-      fullNameArabic: 'يوسف خالد الشامسي',
       nationality: 'UAE',
       dateOfBirth: '1975-05-05',
       gender: 'Male',

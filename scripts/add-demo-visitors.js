@@ -6,9 +6,8 @@ async function addVisitors() {
 
   const visitors = [
     {
-      emiratesId: '784-2000-1111111-1',
+      cnicId: '784-2000-1111111-1',
       fullNameEnglish: 'Sara Ahmed Al Farsi',
-      fullNameArabic: 'سارة أحمد الفارسي',
       nationality: 'Oman',
       dateOfBirth: '2000-02-20',
       gender: 'Female',
@@ -16,9 +15,8 @@ async function addVisitors() {
       issueDate: '2025-02-20'
     },
     {
-      emiratesId: '784-1999-2222222-2',
+      cnicId: '784-1999-2222222-2',
       fullNameEnglish: 'Mohammed Faisal Al Balushi',
-      fullNameArabic: 'محمد فيصل البلوشي',
       nationality: 'Oman',
       dateOfBirth: '1999-07-15',
       gender: 'Male',

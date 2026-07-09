@@ -5,9 +5,9 @@ const visitorSchema = new mongoose.Schema({
     type: String,
     unique: true
   },
-  emiratesId: {
+  cnicId: {
     type: String,
-    required: [true, 'Emirates ID is required'],
+    required: [true, 'CNIC ID is required'],
     trim: true
   },
   fullNameEnglish: {
@@ -16,11 +16,6 @@ const visitorSchema = new mongoose.Schema({
     trim: true
   },
   fatherName: {
-    type: String,
-    default: '',
-    trim: true
-  },
-  fullNameArabic: {
     type: String,
     default: '',
     trim: true
@@ -102,7 +97,7 @@ const visitorSchema = new mongoose.Schema({
 });
 
 // Indexes for faster queries.
-visitorSchema.index({ emiratesId: 1 });
+visitorSchema.index({ cnicId: 1 });
 visitorSchema.index({ status: 1 });
 visitorSchema.index({ checkInTime: -1 });
 visitorSchema.index({ nationality: 1 });

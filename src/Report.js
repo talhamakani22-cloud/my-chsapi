@@ -206,7 +206,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
           .map(
             (visitor) => `
               <tr>
-                <td>${visitor.emiratesId || '-'}</td>
+                <td>${visitor.cnicId || '-'}</td>
                 <td>${visitor.fullNameEnglish || '-'}</td>
                 <td>${visitor.fatherName || '-'}</td>
                 <td>${visitor.countryOfStay || visitor.nationality || '-'}</td>
@@ -395,7 +395,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
               {filteredVisitors.length > 0 ? (
                 filteredVisitors.map((visitor, index) => (
                   <tr key={index}>
-                    <td className="emirates-id-cell">{visitor.emiratesId}</td>
+                    <td className="emirates-id-cell">{visitor.cnicId}</td>
                     <td className="name-en-cell">{visitor.fullNameEnglish}</td>
                     <td>{visitor.fatherName || '-'}</td>
                     <td>
@@ -428,6 +428,9 @@ function Report({ onBackToDashboard, onRequireLogin }) {
       <div className="report-actions">
         <button className="action-btn export-btn">
           📥 Export to CSV
+        </button>
+        <button className="action-btn export-btn" onClick={handlePrintReport}>
+          💾 Save PDF
         </button>
         <button className="action-btn print-btn" onClick={handlePrintReport}>
           🖨️ Print Report

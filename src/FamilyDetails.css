@@ -353,6 +353,54 @@
   background: linear-gradient(135deg, #58aee6 0%, #9fd7f5 100%);
 }
 
+.family-report-actions {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: #eef4f9;
+  padding: 20px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.family-print-btn {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #f7fafc;
+  color: #0f2233;
+}
+
+.family-print-btn:hover {
+  background: #edf2f7;
+  border-color: #58aee6;
+}
+
+.family-back-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #58aee6 0%, #9fd7f5 100%);
+  box-shadow: 0 4px 20px rgba(63, 143, 202, 0.35);
+}
+
+.family-back-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px rgba(63, 143, 202, 0.45);
+}
+
 @media (max-width: 768px) {
   .family-report-content {
     padding: 16px;
