@@ -149,12 +149,16 @@ router.post('/', upload.single('complaintMedia'), async (req, res) => {
 
   const description = String(req.body.description || '').trim();
   const complaintType = String(req.body.complaintType || '').trim();
+  const complaintMediaBase64 = String(req.body.complaintMediaBase64 || '').trim();
+  const complaintMediaName = String(req.body.complaintMediaName || 'complaint-media.jpg').trim();
+  const complaintMediaMimeType = String(req.body.complaintMediaMimeType || 'image/jpeg').trim();
 
   if (!description) {
     return res.status(400).json({ success: false, message: 'Complaint description is required.' });
   }
 
-  if (!req.file) {
+  // Check for either file upload (FormData) or base64 (JSON)
+  if (!req.file && !complaintMediaBase64) {
     return res.status(400).json({ success: false, message: 'Please upload a picture or video.' });
   }
 
@@ -170,8 +174,55 @@ router.post('/', upload.single('complaintMedia'), async (req, res) => {
     }
 
     const ticketNo = `CMP-${Date.now()}`;
-    const mediaUri = `/uploads/complaints/${req.file.filename}`;
-    const mediaKind = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+    let mediaUri = '';
+    let mediaKind = 'image';
+    let storedMimeType = '';
+    let storedFileName = '';
+
+    // Handle JSON base64 upload
+    if (complaintMediaBase64 && !req.file) {
+      const normalizedBase64 = complaintMediaBase64
+        .replace(/^data:image\/[a-z]+;base64,/, '')
+        .replace(/^data:video\/[a-z]+;base64,/, '')
+        .replace(/^data:[^;]+;base64,/, '');
+      
+      const mediaBuffer = Buffer.from(normalizedBase64, 'base64');
+      if (!mediaBuffer.length) {
+        return res.status(400).json({ success: false, message: 'Uploaded media file is empty.' });
+      }
+
+      // Determine file extension
+      let fileExt = '.jpg';
+      const mimeType = complaintMediaMimeType.toLowerCase();
+      if (mimeType.includes('png')) {
+        fileExt = '.png';
+      } else if (mimeType.includes('video')) {
+        fileExt = '.mp4';
+        mediaKind = 'video';
+      }
+
+      const uploadsDir = path.join(uploadsRoot, 'complaints');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const safeFileName = String(complaintMediaName || 'complaint').split('.')[0]
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .slice(0, 60);
+      
+      storedFileName = `complaint-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExt}`;
+      const filePath = path.join(uploadsDir, storedFileName);
+      
+      fs.writeFileSync(filePath, mediaBuffer);
+      mediaUri = `/uploads/complaints/${storedFileName}`;
+      storedMimeType = complaintMediaMimeType;
+    } else if (req.file) {
+      // Handle FormData file upload
+      mediaUri = `/uploads/complaints/${req.file.filename}`;
+      storedFileName = req.file.filename;
+      storedMimeType = req.file.mimetype;
+      mediaKind = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+    }
 
     const payload = {
       ticketNo,
@@ -179,7 +230,7 @@ router.post('/', upload.single('complaintMedia'), async (req, res) => {
       description,
       mediaUri,
       mediaAvailable: true,
-      mediaMimeType: req.file.mimetype,
+      mediaMimeType: storedMimeType,
       mediaKind,
       flatNumber: access.flatNumber || '',
       status: 'Open',

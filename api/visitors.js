@@ -108,7 +108,7 @@ const upload = multer({
   },
 });
 
-// POST /api/visitors - Add a new visitor
+// POST /api/visitors - Add a new visitor (supports JSON with base64 OR FormData)
 router.post('/', upload.single('cnicPdf'), async (req, res) => {
   const {
     emiratesId,
@@ -125,7 +125,10 @@ router.post('/', upload.single('cnicPdf'), async (req, res) => {
     expiryDate,
     purposeOfVisit,
     remark,
-    platform
+    platform,
+    cnicImageBase64,
+    cnicImageName,
+    cnicImageMimeType
   } = req.body;
 
   const normalizedGender = normalizeGender(gender);
@@ -147,7 +150,42 @@ router.post('/', upload.single('cnicPdf'), async (req, res) => {
       return res.status(500).json({ success: false, message: 'Database connection not ready. Please try again.' });
     }
 
-    const scannedImageUri = req.file ? `/uploads/cnic-scans/${req.file.filename}` : null;
+    let scannedImageUri = null;
+    let storedFileName = null;
+
+    // Handle JSON base64 image upload
+    if (cnicImageBase64 && !req.file) {
+      const normalizedBase64 = String(cnicImageBase64).trim()
+        .replace(/^data:image\/[a-z]+;base64,/, '')
+        .replace(/^data:[^;]+;base64,/, '');
+      
+      const imageBuffer = Buffer.from(normalizedBase64, 'base64');
+      if (!imageBuffer.length) {
+        return res.status(400).json({ success: false, message: 'Uploaded CNIC image is empty.' });
+      }
+
+      // Determine file extension
+      let fileExt = '.jpg';
+      const mimeType = String(cnicImageMimeType || 'image/jpeg').toLowerCase();
+      if (mimeType.includes('png')) {
+        fileExt = '.png';
+      }
+
+      const safeFileName = String(cnicImageName || 'cnic').split('.')[0]
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .slice(0, 60);
+      
+      storedFileName = `cnic-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExt}`;
+      const filePath = path.join(uploadDir, storedFileName);
+      
+      fs.writeFileSync(filePath, imageBuffer);
+      scannedImageUri = `/uploads/cnic-scans/${storedFileName}`;
+    } else if (req.file) {
+      // Handle FormData file upload
+      scannedImageUri = `/uploads/cnic-scans/${req.file.filename}`;
+      storedFileName = req.file.filename;
+    }
+
     const visitor = new Visitor({
       emiratesId,
       fullNameEnglish,
@@ -185,7 +223,26 @@ router.post('/', upload.single('cnicPdf'), async (req, res) => {
     res.status(201).json({ 
       success: true, 
       message: 'Visitor added successfully',
-      visitor 
+      visitor: {
+        _id: visitor._id,
+        emiratesId: visitor.emiratesId,
+        fullNameEnglish: visitor.fullNameEnglish,
+        fatherName: visitor.fatherName,
+        fullNameArabic: visitor.fullNameArabic,
+        nationality: visitor.nationality,
+        countryOfStay: visitor.countryOfStay,
+        houseNumber: visitor.houseNumber,
+        entryTime: visitor.entryTime,
+        dateOfBirth: visitor.dateOfBirth,
+        gender: visitor.gender,
+        issueDate: visitor.issueDate,
+        expiryDate: visitor.expiryDate,
+        purposeOfVisit: visitor.purposeOfVisit,
+        remark: visitor.remark,
+        scannedImageUri: visitor.scannedImageUri,
+        platform: visitor.platform,
+        createdAt: visitor.createdAt
+      }
     });
   } catch (err) {
     console.error('[❌ Visitor Save Error]', {

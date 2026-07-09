@@ -761,10 +761,6 @@ router.put('/:id/status', async (req, res) => {
 });
 
 router.post('/upload-slip', uploadSlip.single('slipPdf'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ success: false, message: 'Please upload a PDF payment slip.' });
-  }
-
   const sessionUser = req?.session?.user;
   if (!sessionUser?.email) {
     return res.status(401).json({ success: false, message: 'Please log in first.' });
@@ -772,8 +768,17 @@ router.post('/upload-slip', uploadSlip.single('slipPdf'), async (req, res) => {
 
   const receiptIdRaw = String(req.body.receiptId || '').trim();
   const receiptNo = String(req.body.receiptNo || '').trim();
+  const slipImageBase64 = String(req.body.slipImageBase64 || '').trim();
+  const slipImageName = String(req.body.slipImageName || 'payment-slip.jpg').trim();
+  const slipImageMimeType = String(req.body.slipImageMimeType || 'image/jpeg').trim();
+
   if (!receiptIdRaw && !receiptNo) {
     return res.status(400).json({ success: false, message: 'receiptId or receiptNo is required.' });
+  }
+
+  // Check for either file upload (FormData) or base64 (JSON)
+  if (!req.file && !slipImageBase64) {
+    return res.status(400).json({ success: false, message: 'Please upload a payment slip.' });
   }
 
   try {
@@ -798,9 +803,49 @@ router.post('/upload-slip', uploadSlip.single('slipPdf'), async (req, res) => {
     }
 
     const residentEmail = String(sessionUser.email).trim().toLowerCase();
-    const relativePath = `/uploads/maintenance-slips/${req.file.filename}`;
-    const absoluteUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
     const paidAt = new Date();
+    let relativePath = '';
+    let storedFileName = '';
+
+    // Handle JSON base64 upload
+    if (slipImageBase64 && !req.file) {
+      const normalizedBase64 = slipImageBase64
+        .replace(/^data:image\/[a-z]+;base64,/, '')
+        .replace(/^data:[^;]+;base64,/, '');
+      
+      const slipBuffer = Buffer.from(normalizedBase64, 'base64');
+      if (!slipBuffer.length) {
+        return res.status(400).json({ success: false, message: 'Uploaded slip image is empty.' });
+      }
+
+      // Determine file extension
+      let fileExt = '.jpg';
+      const mimeType = slipImageMimeType.toLowerCase();
+      if (mimeType.includes('png')) {
+        fileExt = '.png';
+      }
+
+      const slipsDir = path.join(uploadsRoot, 'maintenance-slips');
+      if (!fs.existsSync(slipsDir)) {
+        fs.mkdirSync(slipsDir, { recursive: true });
+      }
+
+      const safeFileName = String(slipImageName || 'slip').split('.')[0]
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .slice(0, 60);
+      
+      storedFileName = `slip-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExt}`;
+      const filePath = path.join(slipsDir, storedFileName);
+      
+      fs.writeFileSync(filePath, slipBuffer);
+      relativePath = `/uploads/maintenance-slips/${storedFileName}`;
+    } else if (req.file) {
+      // Handle FormData file upload
+      relativePath = `/uploads/maintenance-slips/${req.file.filename}`;
+      storedFileName = req.file.filename;
+    }
+
+    const absoluteUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
 
     const updateResult = await db.collection(INBOX_COLLECTION).updateOne(
       { receiptId: receipt._id, email: residentEmail },
@@ -808,10 +853,10 @@ router.post('/upload-slip', uploadSlip.single('slipPdf'), async (req, res) => {
         $set: {
           status: 'paid',
           paymentDate: paidAt,
-          paymentSlipName: req.file.originalname,
-          paymentSlipStoredFileName: req.file.filename,
-          paymentSlipMimeType: req.file.mimetype,
-          paymentSlipSize: req.file.size,
+          paymentSlipName: slipImageName || req.file?.originalname || 'payment-slip',
+          paymentSlipStoredFileName: storedFileName,
+          paymentSlipMimeType: slipImageMimeType || req.file?.mimetype,
+          paymentSlipSize: slipImageBase64 ? Buffer.byteLength(slipImageBase64, 'base64') : req.file?.size,
           paymentSlipPath: relativePath,
           paymentSlipUrl: absoluteUrl,
           updatedAt: new Date(),

@@ -155,4 +155,126 @@ router.post('/upload-card-pdf', upload.single('cardPdf'), async (req, res) => {
   }
 });
 
+// New endpoint: Upload vehicle card image as JSON with base64
+router.post('/upload-card-image', async (req, res) => {
+  try {
+    const ownerCnic = String(req.body.ownerCnic || '').trim();
+    const flatNumber = String(req.body.flatNumber || '').trim();
+    const vehicleType = String(req.body.vehicleType || '').trim();
+    const vehicleNumber = String(req.body.vehicleNumber || '').trim().toUpperCase();
+    const address = String(req.body.address || '').trim();
+    const registrationDate = String(req.body.registrationDate || '').trim();
+    const cardImageBase64 = String(req.body.cardImageBase64 || '').trim();
+    const cardImageName = String(req.body.cardImageName || 'vehicle-card.jpg').trim();
+    const cardImageMimeType = String(req.body.cardImageMimeType || 'image/jpeg').trim();
+
+    if (!ownerCnic || !flatNumber || !vehicleType || !vehicleNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Owner CNIC, flat number, vehicle type, and vehicle number are required.',
+      });
+    }
+
+    if (!cardImageBase64) {
+      return res.status(400).json({
+        success: false,
+        message: 'cardImageBase64 is required.',
+      });
+    }
+
+    // Validate image mime type
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedMimes.includes(cardImageMimeType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only JPG/PNG images are allowed.',
+      });
+    }
+
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    // Convert base64 to buffer
+    const imageBuffer = Buffer.from(cardImageBase64, 'base64');
+    const fileSize = imageBuffer.length;
+
+    // Validate file size (max 15MB)
+    if (fileSize > 15 * 1024 * 1024) {
+      return res.status(400).json({
+        success: false,
+        message: 'File size exceeds maximum limit of 15MB.',
+      });
+    }
+
+    // Determine file extension
+    let fileExt = '.jpg';
+    if (cardImageMimeType === 'image/png') {
+      fileExt = '.png';
+    } else if (cardImageName.endsWith('.png')) {
+      fileExt = '.png';
+    }
+
+    // Create filename with timestamp
+    const safeFileName = path
+      .basename(cardImageName, path.extname(cardImageName))
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 60);
+    const storedFileName = `${Date.now()}-${safeFileName || 'vehicle-card'}${fileExt}`;
+
+    // Ensure upload directory exists
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    // Write file to disk
+    const filePath = path.join(uploadDir, storedFileName);
+    fs.writeFileSync(filePath, imageBuffer);
+
+    const relativePath = `/uploads/vehicle-cards/${storedFileName}`;
+
+    const payload = {
+      ownerCnic,
+      flatNumber,
+      vehicleType,
+      vehicleNumber,
+      address,
+      registrationDate,
+      fileName: cardImageName,
+      storedFileName,
+      mimeType: cardImageMimeType,
+      size: fileSize,
+      filePath: relativePath,
+      uploadedAt: new Date(),
+    };
+
+    const result = await db.collection(VEHICLE_COLLECTION).insertOne(payload);
+
+    console.log(`[✅ Vehicle Card Image Uploaded to MongoDB] at ${new Date().toISOString()}`);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Vehicle registration saved successfully.',
+      record: {
+        _id: result.insertedId,
+        ownerCnic,
+        flatNumber,
+        vehicleType,
+        vehicleNumber,
+        address,
+        registrationDate,
+        cardUri: relativePath,
+        uploadedAt: new Date().toISOString(),
+      },
+    });
+  } catch (err) {
+    console.error(`[❌ Vehicle Card Image Save Error] ${err.message}`);
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Vehicle registration save failed.',
+    });
+  }
+});
+
 module.exports = router;
