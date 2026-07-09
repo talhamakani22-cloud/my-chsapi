@@ -8,6 +8,30 @@ const fs = require('fs');
 
 const express = require('express');
 const router = express.Router();
+
+router.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    res.on('finish', () => {
+      const payload = req.body && typeof req.body === 'object' ? req.body : {};
+      console.log('[Incoming request body]', {
+        method: req.method,
+        path: req.originalUrl,
+        statusCode: res.statusCode,
+        ...payload,
+        uploadedFile: req.file
+          ? {
+              originalname: req.file.originalname,
+              mimetype: req.file.mimetype,
+              size: req.file.size,
+              filename: req.file.filename,
+            }
+          : null,
+        timestamp: new Date().toISOString(),
+      });
+    });
+  }
+  next();
+});
 const uploadsRoot = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
   : path.join(__dirname, '..', 'uploads');
@@ -109,6 +133,41 @@ const upload = multer({
 
 // POST /api/visitors - Add a new visitor (supports JSON with base64 OR FormData)
 router.post('/', upload.single('cnicPdf'), async (req, res) => {
+  const requestPayload = req.body || {};
+  console.log('[📥 Incoming /api/visitors request body]', {
+    cnicId: requestPayload.cnicId,
+    fullNameEnglish: requestPayload.fullNameEnglish,
+    fatherName: requestPayload.fatherName,
+    nationality: requestPayload.nationality,
+    countryOfStay: requestPayload.countryOfStay,
+    houseNumber: requestPayload.houseNumber,
+    entryTime: requestPayload.entryTime,
+    dateOfBirth: requestPayload.dateOfBirth,
+    gender: requestPayload.gender,
+    issueDate: requestPayload.issueDate,
+    expiryDate: requestPayload.expiryDate,
+    purposeOfVisit: requestPayload.purposeOfVisit,
+    remark: requestPayload.remark,
+    platform: requestPayload.platform,
+    cnicImageName: requestPayload.cnicImageName,
+    cnicImageMimeType: requestPayload.cnicImageMimeType,
+    cnicImageBase64Preview: requestPayload.cnicImageBase64
+      ? String(requestPayload.cnicImageBase64).slice(0, 80)
+      : null,
+    cnicImageBase64Length: requestPayload.cnicImageBase64
+      ? String(requestPayload.cnicImageBase64).length
+      : 0,
+    uploadedFile: req.file
+      ? {
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          filename: req.file.filename,
+        }
+      : null,
+    timestamp: new Date().toISOString(),
+  });
+
   const {
     cnicId,
     fullNameEnglish,
