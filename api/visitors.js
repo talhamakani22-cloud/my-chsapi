@@ -10,24 +10,10 @@ const express = require('express');
 const router = express.Router();
 
 router.use((req, res, next) => {
-  if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+  if (req.method === 'POST') {
     res.on('finish', () => {
       const payload = req.body && typeof req.body === 'object' ? req.body : {};
-      console.log('[Incoming request body]', {
-        method: req.method,
-        path: req.originalUrl,
-        statusCode: res.statusCode,
-        ...payload,
-        uploadedFile: req.file
-          ? {
-              originalname: req.file.originalname,
-              mimetype: req.file.mimetype,
-              size: req.file.size,
-              filename: req.file.filename,
-            }
-          : null,
-        timestamp: new Date().toISOString(),
-      });
+      console.log('[POST body]', payload);
     });
   }
   next();
