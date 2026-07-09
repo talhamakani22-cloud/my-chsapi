@@ -41,6 +41,13 @@ const upload = multer({
   },
 });
 
+const normalizeFamilyMember = (member = {}) => ({
+  memberName: String(member.memberName || member.name || member.member || '').trim(),
+  relation: String(member.relation || '').trim(),
+  cnic: String(member.cnic || '').trim(),
+  phone: String(member.phone || '').trim(),
+});
+
 router.get('/', async (req, res) => {
   try {
     const access = getAccessScope(req);
@@ -129,19 +136,16 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Resident name and flat number are required.' });
     }
 
-    const sanitizedMembers = familyMembers.map((member) => ({
-      memberName: String(member.memberName || '').trim(),
-      relation: String(member.relation || '').trim(),
-      cnic: String(member.cnic || '').trim(),
-      phone: String(member.phone || '').trim(),
-    }));
+    const sanitizedMembers = familyMembers
+      .map(normalizeFamilyMember)
+      .filter((member) => member.memberName || member.relation || member.cnic || member.phone);
 
     const selector = { _id: new mongoose.Types.ObjectId(recordId) };
     if (access.scope === 'resident') {
       selector.flatNumber = { $regex: buildFlatScopedRegex(access.flatNumber) };
     }
 
-    const result = await db.collection(FAMILY_COLLECTION).findOneAndUpdate(
+    const updateResult = await db.collection(FAMILY_COLLECTION).updateOne(
       selector,
       {
         $set: {
@@ -151,14 +155,15 @@ router.put('/:id', async (req, res) => {
           updatedAt: new Date(),
         },
       },
-      { returnDocument: 'after' }
     );
 
-    if (!result) {
+    if (!updateResult.matchedCount) {
       return res.status(404).json({ success: false, message: 'Family record not found.' });
     }
 
-    return res.json({ success: true, message: 'Family details updated successfully.', record: result });
+    const updatedRecord = await db.collection(FAMILY_COLLECTION).findOne(selector);
+
+    return res.json({ success: true, message: 'Family details updated successfully.', record: updatedRecord || null });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message || 'Failed to update family record.' });
   }
@@ -222,7 +227,7 @@ router.post('/upload-cnic-image', upload.single('cnicImage'), async (req, res) =
     const payload = {
       residentName,
       flatNumber,
-      familyMembers,
+      familyMembers: familyMembers.map(normalizeFamilyMember),
       fileName: req.file?.originalname || cnicImageName,
       storedFileName,
       mimeType: req.file?.mimetype || cnicImageMimeType,

@@ -7,11 +7,13 @@
 **Content-Type:** `application/json` (recommended) or `multipart/form-data`
 **Supports:** Both JSON with base64 encoding AND FormData file uploads
 
-### Request Body (JSON with Base64 Image)
+### Full Request Body (JSON with Base64 Image)
+
+This is the complete request body example for the visitor form and can be sent as-is.
 ```json
 {
   "emiratesId": "12345-1234567-1",
-  "fullNameEnglish": "Ahmed Ali",
+  "fullNameEnglish": "Amjad Ali",
   "fatherName": "Ali Mohammed",
   "fullNameArabic": "أحمد علي",
   "nationality": "Pakistan",

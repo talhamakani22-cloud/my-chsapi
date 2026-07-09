@@ -81,7 +81,7 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
       residentName: record.residentName || '',
       flatNumber: record.flatNumber || '',
       familyMembers: members.map((m) => ({
-        memberName: m.memberName || '',
+        memberName: m.memberName || m.name || '',
         relation: m.relation || '',
         cnic: m.cnic || '',
         phone: m.phone || '',
@@ -133,7 +133,13 @@ function FamilyDetails({ onBackToDashboard, onRequireLogin }) {
       const payload = {
         residentName,
         flatNumber,
-        familyMembers: editForm.familyMembers,
+        familyMembers: editForm.familyMembers.map((member) => ({
+          memberName: member.memberName || member.name || '',
+          name: member.memberName || member.name || '',
+          relation: member.relation || '',
+          cnic: member.cnic || '',
+          phone: member.phone || '',
+        })),
       };
       const res = await fetch(`${API_BASE_URL}/api/family/${editingRecord._id}`, {
         method: 'PUT',
