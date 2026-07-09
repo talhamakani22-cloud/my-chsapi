@@ -194,6 +194,19 @@ function getAuthTarget(loginType) {
   return { collectionName: 'resident', role: 'user' };
 }
 
+function extractFlatNumberForResident(record = {}, email = '') {
+  const emailMatch = String(email || '').toLowerCase().match(/(\d+)@[^@]+$/i);
+  if (emailMatch && emailMatch[1]) return emailMatch[1];
+
+  const usernameMatch = String(record?.username || '').toLowerCase().match(/_(\d+)$/i);
+  if (usernameMatch && usernameMatch[1]) return usernameMatch[1];
+
+  const nameMatch = String(record?.name || '').toLowerCase().match(/_(\d+)$/i);
+  if (nameMatch && nameMatch[1]) return nameMatch[1];
+
+  return '';
+}
+
 // GET login route
 router.get('/login', (req, res) => {
   res.json({ message: 'GET login route (Express)' });
@@ -281,9 +294,17 @@ router.post('/login', async (req, res) => {
         name: residentLogin.record.name || residentLogin.record.username || '',
       };
 
-      req.session.user = { email: residentUser.email, id: residentUser._id, role: 'user', loginType };
+      const residentFlatNumber = extractFlatNumberForResident(residentLogin.record, residentUser.email || normalizedEmail);
+
+      req.session.user = {
+        email: residentUser.email,
+        id: residentUser._id,
+        role: 'user',
+        loginType,
+        flatNumber: residentFlatNumber,
+      };
       console.log('[LOGIN SUCCESS] resident', normalizedEmail);
-      return res.json({ success: true, user: residentUser });
+      return res.json({ success: true, user: { ...residentUser, flatNumber: residentFlatNumber } });
     }
 
     const committeeLogin = await verifyCollectionLogin({
@@ -536,7 +557,7 @@ router.get('/profile', async (req, res) => {
     const record = await collection.findOne({ email });
     const userDoc = record?.userId ? await User.findById(record.userId) : await User.findOne({ email, role });
 
-    const flatNumber = String(extractFlatNumberFromEmail(email) || '').trim();
+    const flatNumber = String(sessionUser.flatNumber || extractFlatNumberFromEmail(email) || '').trim();
     const residentName = String(userDoc?.name || record?.name || record?.username || '').trim();
     const [familyRecord, vehicleRecords] = flatNumber
       ? await Promise.all([

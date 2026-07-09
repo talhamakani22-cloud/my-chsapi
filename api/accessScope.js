@@ -8,7 +8,8 @@ function extractFlatNumberFromEmail(email = '') {
   return match ? match[1] : '';
 }
 
-function getAccessScope(req) {
+function getAccessScope(req, options = {}) {
+  const { allowResidentWithoutFlat = false, allowResidentAll = false } = options;
   const sessionUser = req?.session?.user;
   if (!sessionUser) {
     return {
@@ -27,8 +28,15 @@ function getAccessScope(req) {
   }
 
   if (role === 'user' || loginType === 'resident') {
-    const flatNumber = extractFlatNumberFromEmail(sessionUser.email);
+    if (allowResidentAll) {
+      return { allowed: true, scope: 'all', sessionUser };
+    }
+
+    const flatNumber = String(sessionUser.flatNumber || extractFlatNumberFromEmail(sessionUser.email) || '').trim();
     if (!flatNumber) {
+      if (allowResidentWithoutFlat) {
+        return { allowed: true, scope: 'all', sessionUser };
+      }
       return {
         allowed: false,
         status: 403,

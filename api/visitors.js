@@ -37,7 +37,7 @@ connectDB();
 // GET /api/1001 - Get all visitors
 router.get('/', async (req, res) => {
   try {
-    const access = getAccessScope(req);
+    const access = getAccessScope(req, { allowResidentWithoutFlat: true, allowResidentAll: true });
     if (!access.allowed) {
       return res.status(access.status).json({ success: false, message: access.message });
     }
