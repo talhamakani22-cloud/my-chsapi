@@ -11,7 +11,7 @@ const uploadsRoot = process.env.UPLOADS_DIR
   ? path.resolve(process.env.UPLOADS_DIR)
   : path.join(__dirname, '..', 'uploads');
 
-const uploadDir = path.join(uploadsRoot, 'cnic-pdfs');
+const uploadDir = path.join(uploadsRoot, 'cnic-images');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -20,10 +20,11 @@ const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
   filename: (_req, file, cb) => {
     const safeBase = path
-      .basename(file.originalname || 'cnic.pdf', path.extname(file.originalname || '.pdf'))
+      .basename(file.originalname || 'cnic.jpg', path.extname(file.originalname || '.jpg'))
       .replace(/[^a-zA-Z0-9_-]/g, '_')
       .slice(0, 60);
-    cb(null, `${Date.now()}-${safeBase || 'cnic'}.pdf`);
+    const ext = path.extname(file.originalname || '.jpg').toLowerCase();
+    cb(null, `${Date.now()}-${safeBase || 'cnic'}${ext}`);
   },
 });
 
@@ -31,10 +32,10 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const isPdfMime = file.mimetype === 'application/pdf';
-    const isPdfExt = path.extname(file.originalname || '').toLowerCase() === '.pdf';
-    if (!isPdfMime && !isPdfExt) {
-      return cb(new Error('Only PDF files are allowed.'));
+    const isImageMime = ['image/jpeg', 'image/png', 'image/jpg'].includes(file.mimetype);
+    const isImageExt = ['.jpg', '.jpeg', '.png'].includes(path.extname(file.originalname || '').toLowerCase());
+    if (!isImageMime && !isImageExt) {
+      return cb(new Error('Only JPG and PNG image files are allowed.'));
     }
     return cb(null, true);
   },
@@ -163,13 +164,13 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.post('/upload-cnic-pdf', upload.single('cnicPdf'), async (req, res) => {
-  const cnicPdfBase64 = String(req.body.cnicPdfBase64 || '').trim();
-  const cnicPdfName = String(req.body.cnicPdfName || 'CNIC.pdf').trim() || 'CNIC.pdf';
-  const cnicPdfMimeType = String(req.body.cnicPdfMimeType || 'application/pdf').trim() || 'application/pdf';
+router.post('/upload-cnic-image', upload.single('cnicImage'), async (req, res) => {
+  const cnicImageBase64 = String(req.body.cnicImageBase64 || '').trim();
+  const cnicImageName = String(req.body.cnicImageName || 'CNIC.jpg').trim() || 'CNIC.jpg';
+  const cnicImageMimeType = String(req.body.cnicImageMimeType || 'image/jpeg').trim() || 'image/jpeg';
 
-  if (!req.file && !cnicPdfBase64) {
-    return res.status(400).json({ success: false, message: 'No CNIC PDF uploaded.' });
+  if (!req.file && !cnicImageBase64) {
+    return res.status(400).json({ success: false, message: 'No CNIC image uploaded.' });
   }
 
   const residentName = String(req.body.residentName || '').trim();
@@ -194,11 +195,12 @@ router.post('/upload-cnic-pdf', upload.single('cnicPdf'), async (req, res) => {
   }
 
   const safeBase = path
-    .basename(cnicPdfName, path.extname(cnicPdfName))
+    .basename(cnicImageName, path.extname(cnicImageName))
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .slice(0, 60);
-  const storedFileName = req.file?.filename || `${Date.now()}-${safeBase || 'cnic'}.pdf`;
-  const relativePath = `/uploads/cnic-pdfs/${storedFileName}`;
+  const ext = path.extname(cnicImageName).toLowerCase() || '.jpg';
+  const storedFileName = req.file?.filename || `${Date.now()}-${safeBase || 'cnic'}${ext}`;
+  const relativePath = `/uploads/cnic-images/${storedFileName}`;
   const absoluteUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
 
   try {
@@ -208,10 +210,10 @@ router.post('/upload-cnic-pdf', upload.single('cnicPdf'), async (req, res) => {
     }
 
     if (!req.file) {
-      const normalizedBase64 = cnicPdfBase64.replace(/^data:application\/pdf;base64,/, '').replace(/^data:[^;]+;base64,/, '');
+      const normalizedBase64 = cnicImageBase64.replace(/^data:image\/[a-z]+;base64,/, '').replace(/^data:[^;]+;base64,/, '');
       const fileBuffer = Buffer.from(normalizedBase64, 'base64');
       if (!fileBuffer.length) {
-        return res.status(400).json({ success: false, message: 'Uploaded CNIC PDF is empty.' });
+        return res.status(400).json({ success: false, message: 'Uploaded CNIC image is empty.' });
       }
 
       fs.writeFileSync(path.join(uploadDir, storedFileName), fileBuffer);
@@ -221,10 +223,10 @@ router.post('/upload-cnic-pdf', upload.single('cnicPdf'), async (req, res) => {
       residentName,
       flatNumber,
       familyMembers,
-      fileName: req.file?.originalname || cnicPdfName,
+      fileName: req.file?.originalname || cnicImageName,
       storedFileName,
-      mimeType: req.file?.mimetype || cnicPdfMimeType,
-      size: req.file?.size || Buffer.byteLength(cnicPdfBase64, 'base64'),
+      mimeType: req.file?.mimetype || cnicImageMimeType,
+      size: req.file?.size || Buffer.byteLength(cnicImageBase64, 'base64'),
       filePath: relativePath,
       fileUrl: absoluteUrl,
       uploadedAt: new Date(),
@@ -232,15 +234,29 @@ router.post('/upload-cnic-pdf', upload.single('cnicPdf'), async (req, res) => {
 
     const result = await db.collection(FAMILY_COLLECTION).insertOne(payload);
 
+    console.log('[✅ Family CNIC Image Uploaded to MongoDB]', {
+      id: result.insertedId,
+      residentName: payload.residentName,
+      flatNumber: payload.flatNumber,
+      fileName: payload.fileName,
+      uploadedAt: payload.uploadedAt,
+      timestamp: new Date().toISOString()
+    });
+
     return res.status(201).json({
       success: true,
-      message: 'CNIC PDF uploaded successfully.',
+      message: 'CNIC image uploaded successfully.',
       upload: {
         id: result.insertedId,
         ...payload,
       },
     });
   } catch (err) {
+    console.error('[❌ Family Upload Error]', {
+      error: err.message,
+      stack: err.stack,
+      timestamp: new Date().toISOString()
+    });
     return res.status(500).json({ success: false, message: err.message || 'Upload failed.' });
   }
 });

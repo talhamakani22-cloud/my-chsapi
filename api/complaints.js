@@ -196,11 +196,26 @@ router.post('/', upload.single('complaintMedia'), async (req, res) => {
 
     const result = await db.collection(COMPLAINTS_COLLECTION).insertOne(payload);
 
+    console.log('[✅ Complaint Submitted to MongoDB]', {
+      ticketNo: payload.ticketNo,
+      complaintType: payload.complaintType,
+      flatNumber: payload.flatNumber,
+      sender: payload.sender.email,
+      mediaKind: payload.mediaKind,
+      createdAt: payload.createdAt,
+      timestamp: new Date().toISOString()
+    });
+
     return res.status(201).json({
       success: true,
       row: { id: result.insertedId, ...payload },
     });
   } catch (err) {
+    console.error('[❌ Complaint Creation Error]', {
+      error: err.message,
+      stack: err.stack,
+      timestamp: new Date().toISOString()
+    });
     return res.status(500).json({ success: false, message: err.message || 'Failed to create complaint.' });
   }
 });

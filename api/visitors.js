@@ -73,8 +73,10 @@ router.get('/', async (req, res) => {
         scannedImageAvailable,
       };
     });
+    console.log(`[✅ Fetched ${normalizedVisitors.length} visitors from MongoDB]`);
     res.json({ success: true, visitors: normalizedVisitors });
   } catch (err) {
+    console.error('[❌ Get Visitors Error]', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch visitors', error: err.message });
   }
 });
@@ -139,6 +141,12 @@ router.post('/', upload.single('cnicPdf'), async (req, res) => {
   }
 
   try {
+    // Ensure DB connection before save
+    if (!Visitor.collection.conn.readyState) {
+      console.error('[Visitor Error] Database connection not ready');
+      return res.status(500).json({ success: false, message: 'Database connection not ready. Please try again.' });
+    }
+
     const scannedImageUri = req.file ? `/uploads/cnic-scans/${req.file.filename}` : null;
     const visitor = new Visitor({
       emiratesId,
@@ -158,8 +166,10 @@ router.post('/', upload.single('cnicPdf'), async (req, res) => {
       scannedImageUri,
       platform: platform || 'expo'
     });
+    
     await visitor.save();
-    console.log('[Visitor Added]', {
+    
+    console.log('[✅ Visitor Added to MongoDB]', {
       id: visitor._id,
       emiratesId: visitor.emiratesId,
       fullNameEnglish: visitor.fullNameEnglish,
@@ -167,11 +177,27 @@ router.post('/', upload.single('cnicPdf'), async (req, res) => {
       dateOfBirth: visitor.dateOfBirth,
       gender: visitor.gender,
       purposeOfVisit: visitor.purposeOfVisit,
-      remark: visitor.remark
+      remark: visitor.remark,
+      platform: visitor.platform,
+      timestamp: new Date().toISOString()
     });
-    res.status(201).json(visitor);
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Visitor added successfully',
+      visitor 
+    });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error('[❌ Visitor Save Error]', {
+      error: err.message,
+      stack: err.stack,
+      timestamp: new Date().toISOString()
+    });
+    res.status(400).json({ 
+      success: false, 
+      message: err.message || 'Failed to save visitor',
+      error: err.message 
+    });
   }
 });
 
