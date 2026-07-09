@@ -194,6 +194,10 @@ function getAuthTarget(loginType) {
   return { collectionName: 'resident', role: 'user' };
 }
 
+function normalizeVehicleNumberKey(value = '') {
+  return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
 function extractFlatNumberForResident(record = {}, email = '') {
   const emailMatch = String(email || '').toLowerCase().match(/(\d+)@[^@]+$/i);
   if (emailMatch && emailMatch[1]) return emailMatch[1];
@@ -711,7 +715,8 @@ router.put('/profile', async (req, res) => {
           const vehicleFlatNumber = String(vehicle.flatNumber || residentFlatNumber).trim();
           const vehicleType = String(vehicle.vehicleType || '').trim();
           const vehicleNumber = String(vehicle.vehicleNumber || '').trim().toUpperCase();
-          if (!ownerName || !vehicleFlatNumber || !vehicleType || !vehicleNumber) {
+          const vehicleNumberKey = normalizeVehicleNumberKey(vehicleNumber);
+          if (!ownerName || !vehicleFlatNumber || !vehicleType || !vehicleNumber || !vehicleNumberKey) {
             continue;
           }
 
@@ -721,6 +726,7 @@ router.put('/profile', async (req, res) => {
             flatNumber: vehicleFlatNumber,
             vehicleType,
             vehicleNumber,
+            vehicleNumberKey,
             address: String(vehicle.address || '').trim(),
             registrationDate: String(vehicle.registrationDate || '').trim(),
             updatedAt: new Date(),
@@ -735,7 +741,14 @@ router.put('/profile', async (req, res) => {
             );
           } else {
             await vehicleCollection.updateOne(
-              { flatNumber: vehicleFlatNumber, vehicleNumber, isActive: { $ne: false } },
+              {
+                flatNumber: vehicleFlatNumber,
+                isActive: { $ne: false },
+                $or: [
+                  { vehicleNumberKey },
+                  { vehicleNumber },
+                ],
+              },
               { $set: vehiclePayload, $setOnInsert: { createdAt: new Date() } },
               { upsert: true }
             );
