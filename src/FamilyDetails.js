@@ -7,6 +7,10 @@ function FamilyDetails({
   onBackToDashboard,
   onRequireLogin,
 }) {
+  const cnicPattern = /^(\d{13}|\d{5}-\d{7}-\d)$/;
+  const namePattern = /^[A-Za-z][A-Za-z\s.'-]{1,59}$/;
+  const phonePattern = /^\+?\d{10,15}$/;
+
   const [records, setRecords] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
@@ -122,13 +126,59 @@ function FamilyDetails({
       return;
     }
 
+    if (!namePattern.test(residentName)) {
+      setError('Resident name must be 2-60 characters and contain letters only.');
+      return;
+    }
+
+    if (!/\d/.test(flatNumber) || flatNumber.length > 20) {
+      setError('Flat number must include digits and be at most 20 characters.');
+      return;
+    }
+
+    const cleanedMembers = (Array.isArray(editForm.familyMembers) ? editForm.familyMembers : [])
+      .map((member) => ({
+        memberName: String(member.memberName || member.name || '').trim(),
+        relation: String(member.relation || '').trim(),
+        cnic: String(member.cnic || '').trim(),
+        phone: String(member.phone || '').trim(),
+      }))
+      .filter((member) => member.memberName || member.relation || member.cnic || member.phone);
+
+    const invalidMember = cleanedMembers.find((member) => {
+      if (!member.memberName || !namePattern.test(member.memberName)) return true;
+      if (!member.relation || member.relation.length < 2 || member.relation.length > 30) return true;
+      if (!cnicPattern.test(member.cnic)) return true;
+      if (member.phone && !phonePattern.test(member.phone)) return true;
+      return false;
+    });
+
+    if (invalidMember) {
+      setError('Each member needs valid name, relation, CNIC format, and optional phone format.');
+      return;
+    }
+
+    const seen = new Set();
+    const hasDuplicateCnic = cleanedMembers.some((member) => {
+      const key = member.cnic.replace(/\D/g, '');
+      if (!key) return false;
+      if (seen.has(key)) return true;
+      seen.add(key);
+      return false;
+    });
+
+    if (hasDuplicateCnic) {
+      setError('Duplicate CNIC is not allowed in family members.');
+      return;
+    }
+
     setSavingEdit(true);
     setError('');
     try {
       const payload = {
         residentName,
         flatNumber,
-        familyMembers: editForm.familyMembers.map((member) => ({
+        familyMembers: cleanedMembers.map((member) => ({
           memberName: member.memberName || member.name || '',
           name: member.memberName || member.name || '',
           relation: member.relation || '',
