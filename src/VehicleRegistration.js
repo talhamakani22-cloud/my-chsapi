@@ -10,8 +10,11 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const isRecordActive = (record) => record?.isActive !== false;
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -29,6 +32,9 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
     setError('');
     try {
       const params = new URLSearchParams();
+      if (statusFilter !== 'active') {
+        params.append('includeInactive', 'true');
+      }
       if (searchQuery.trim()) {
         params.append('search', searchQuery.trim());
       }
@@ -51,7 +57,7 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
       fetchVehicleRecords();
     }, 30000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [searchQuery, statusFilter]);
 
   const parseRecordDate = (record) => {
     const source = record.uploadedAt || record.registrationDate;
@@ -103,6 +109,13 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
         .toLowerCase();
 
       const searchPass = !searchQuery.trim() || searchTarget.includes(searchQuery.trim().toLowerCase());
+      const active = isRecordActive(record);
+      const statusPass =
+        statusFilter === 'all'
+          ? true
+          : statusFilter === 'inactive'
+            ? !active
+            : active;
 
       const parsedDate = parseRecordDate(record);
       const monthPass = !selectedMonth || getMonthKey(record) === selectedMonth;
@@ -121,9 +134,9 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
         endPass = false;
       }
 
-      return searchPass && monthPass && startPass && endPass;
+      return searchPass && statusPass && monthPass && startPass && endPass;
     });
-  }, [records, searchQuery, selectedMonth, startDate, endDate]);
+  }, [records, searchQuery, statusFilter, selectedMonth, startDate, endDate]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -139,7 +152,39 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
     setStartDate('');
     setEndDate('');
     setSelectedMonth('');
+    setStatusFilter('active');
     setError('');
+  };
+
+  const handleStatusFilterChange = (value) => {
+    setStatusFilter(value);
+  };
+
+  const handleToggleStatus = async (record) => {
+    if (!record?._id) return;
+
+    const active = isRecordActive(record);
+    const confirmed = window.confirm(`Mark vehicle ${record.vehicleNumber || ''} as ${active ? 'inactive' : 'active'}?`);
+    if (!confirmed) return;
+
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/vehicle/${record._id}/status`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !active }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to update vehicle status.');
+      }
+      fetchVehicleRecords();
+    } catch (err) {
+      setError(err.message || 'Failed to update vehicle status.');
+    }
+    setLoading(false);
   };
 
   const handlePrintReport = () => {
@@ -157,12 +202,13 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
                 <td>${record.vehicleType || '-'}</td>
                 <td>${record.vehicleNumber || '-'}</td>
                 <td>${record.registrationDate || '-'}</td>
+                <td>${record.isActive !== false ? 'Active' : 'Inactive'}</td>
                 <td>${record.uploadedAt ? new Date(record.uploadedAt).toLocaleString() : '-'}</td>
               </tr>
             `
           )
           .join('')
-      : '<tr><td colspan="7" style="text-align:center; padding:16px;">No records found</td></tr>';
+      : '<tr><td colspan="8" style="text-align:center; padding:16px;">No records found</td></tr>';
 
     const printedAt = new Date().toLocaleString();
 
@@ -193,6 +239,7 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
                 <th>Vehicle Type</th>
                 <th>Vehicle Number</th>
                 <th>Registration Date</th>
+                <th>Status</th>
                 <th>Uploaded At</th>
               </tr>
             </thead>
@@ -267,6 +314,19 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
               </select>
             </div>
 
+            <div className="month-group">
+              <label>Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => handleStatusFilterChange(e.target.value)}
+                className="month-select"
+              >
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+
             <div className="search-group">
               <label>Search</label>
               <div className="search-input-wrapper">
@@ -304,7 +364,9 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
                 <th>Vehicle Type</th>
                 <th>Vehicle Number</th>
                 <th>Registration Date</th>
+                <th>Status</th>
                 <th>Uploaded At</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -317,12 +379,25 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
                     <td><span className="nationality-badge">{record.vehicleType || '-'}</span></td>
                     <td><strong>{record.vehicleNumber || '-'}</strong></td>
                     <td>{record.registrationDate || '-'}</td>
+                    <td>
+                      <span className={`vehicle-status-badge ${isRecordActive(record) ? 'active' : 'inactive'}`}>
+                        {isRecordActive(record) ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
                     <td>{record.uploadedAt ? new Date(record.uploadedAt).toLocaleString() : '-'}</td>
+                    <td>
+                      <button
+                        className="vehicle-status-btn"
+                        onClick={() => handleToggleStatus(record)}
+                      >
+                        {isRecordActive(record) ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="no-results">No vehicle records found matching your criteria</td>
+                  <td colSpan="9" className="no-results">No vehicle records found matching your criteria</td>
                 </tr>
               )}
             </tbody>

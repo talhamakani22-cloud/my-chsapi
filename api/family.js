@@ -214,6 +214,65 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+router.put('/:id/status', async (req, res) => {
+  try {
+    const statusPayload = req.body && typeof req.body === 'object' ? req.body : {};
+    console.log('[Family status PUT body]', statusPayload);
+
+    const access = getAccessScope(req);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const recordId = String(req.params.id || '').trim();
+    if (!recordId || !mongoose.Types.ObjectId.isValid(recordId)) {
+      return res.status(400).json({ success: false, message: 'Invalid record id.' });
+    }
+
+    const selector = { _id: new mongoose.Types.ObjectId(recordId) };
+    if (access.scope === 'resident') {
+      selector.flatNumber = { $regex: buildFlatScopedRegex(access.flatNumber) };
+    }
+
+    const currentRecord = await db.collection(FAMILY_COLLECTION).findOne(selector);
+    if (!currentRecord) {
+      return res.status(404).json({ success: false, message: 'Family record not found.' });
+    }
+
+    const requestedIsActive = typeof req.body.isActive === 'boolean'
+      ? req.body.isActive
+      : currentRecord.isActive === false;
+
+    const updateResult = await db.collection(FAMILY_COLLECTION).updateOne(
+      selector,
+      {
+        $set: {
+          isActive: requestedIsActive,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    if (!updateResult.matchedCount) {
+      return res.status(404).json({ success: false, message: 'Family record not found.' });
+    }
+
+    const updatedRecord = await db.collection(FAMILY_COLLECTION).findOne(selector);
+    return res.json({
+      success: true,
+      message: requestedIsActive ? 'Family record activated successfully.' : 'Family record deactivated successfully.',
+      record: updatedRecord || null,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to update family status.' });
+  }
+});
+
 router.post('/upload-cnic-image', upload.single('cnicImage'), async (req, res) => {
   const cnicImageBase64 = String(req.body.cnicImageBase64 || '').trim();
   const cnicImageName = String(req.body.cnicImageName || 'CNIC.jpg').trim() || 'CNIC.jpg';

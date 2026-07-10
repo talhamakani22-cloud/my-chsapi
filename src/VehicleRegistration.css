@@ -145,6 +145,42 @@
   font-weight: 700;
 }
 
+.vehicle-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.vehicle-status-badge.active {
+  background: #e7f8ef;
+  color: #137a42;
+}
+
+.vehicle-status-badge.inactive {
+  background: #fbe9e9;
+  color: #b42318;
+}
+
+.vehicle-status-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vehicle-status-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(59, 130, 246, 0.24);
+}
+
 .file-link {
   color: #0369a1;
   text-decoration: none;

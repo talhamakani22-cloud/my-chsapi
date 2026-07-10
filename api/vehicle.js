@@ -65,7 +65,8 @@ router.get('/', async (req, res) => {
     }
 
     const search = String(req.query.search || '').trim();
-    const query = { isActive: { $ne: false } };
+    const includeInactive = String(req.query.includeInactive || '').toLowerCase() === 'true';
+    const query = includeInactive ? {} : { isActive: { $ne: false } };
 
     if (access.scope === 'resident') {
       query.flatNumber = { $regex: buildFlatScopedRegex(access.flatNumber) };
@@ -455,6 +456,65 @@ router.delete('/:id', async (req, res) => {
     return res.json({ success: true, message: 'Vehicle deleted successfully.' });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message || 'Failed to delete vehicle record.' });
+  }
+});
+
+router.put('/:id/status', async (req, res) => {
+  try {
+    const statusPayload = req.body && typeof req.body === 'object' ? req.body : {};
+    console.log('[Vehicle status PUT body]', statusPayload);
+
+    const access = getAccessScope(req);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const recordId = String(req.params.id || '').trim();
+    if (!recordId || !mongoose.Types.ObjectId.isValid(recordId)) {
+      return res.status(400).json({ success: false, message: 'Invalid vehicle record id.' });
+    }
+
+    const selector = { _id: new mongoose.Types.ObjectId(recordId) };
+    if (access.scope === 'resident') {
+      selector.flatNumber = { $regex: buildFlatScopedRegex(access.flatNumber) };
+    }
+
+    const currentRecord = await db.collection(VEHICLE_COLLECTION).findOne(selector);
+    if (!currentRecord) {
+      return res.status(404).json({ success: false, message: 'Vehicle record not found.' });
+    }
+
+    const requestedIsActive = typeof req.body.isActive === 'boolean'
+      ? req.body.isActive
+      : currentRecord.isActive === false;
+
+    const updateResult = await db.collection(VEHICLE_COLLECTION).updateOne(
+      selector,
+      {
+        $set: {
+          isActive: requestedIsActive,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    if (!updateResult.matchedCount) {
+      return res.status(404).json({ success: false, message: 'Vehicle record not found.' });
+    }
+
+    const updatedRecord = await db.collection(VEHICLE_COLLECTION).findOne(selector);
+    return res.json({
+      success: true,
+      message: requestedIsActive ? 'Vehicle record activated successfully.' : 'Vehicle record deactivated successfully.',
+      record: updatedRecord || null,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to update vehicle status.' });
   }
 });
 
