@@ -471,18 +471,14 @@ function ERecipets({ onBackToDashboard, onRequireLogin }) {
                       </td>
                       <td>
                         {buildFileUrl(row.paymentSlipPath || row.paymentSlipUrl) ? (
-                          row.paymentSlipAvailable === false ? (
-                            <span className="erecipets-slip-link" style={{ color: '#fca5a5' }}>File missing</span>
-                          ) : (
-                            <a
-                              className="erecipets-slip-link"
-                              href={buildFileUrl(row.paymentSlipPath || row.paymentSlipUrl)}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {row.paymentSlipName ? 'View Slip' : 'Open Proof'}
-                            </a>
-                          )
+                          <a
+                            className="erecipets-slip-link"
+                            href={buildFileUrl(row.paymentSlipPath || row.paymentSlipUrl)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {row.paymentSlipName ? 'View Slip' : 'Open Proof'}
+                          </a>
                         ) : (
                           '-'
                         )}

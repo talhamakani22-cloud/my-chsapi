@@ -215,28 +215,24 @@ function Documents({ onBackToDashboard, onRequireLogin }) {
               {records.length > 0 ? (
                 records.map((record) => {
                   const fileUrl = buildFileUrl(record.filePath || record.fileUrl);
-                  const fileAvailable = record.fileAvailable !== false;
                   return (
                     <tr key={String(record._id || `${record.flatNumber}-${record.uploadedAt}`)}>
                       <td className="name-en-cell">{record.ownerName || '-'}</td>
                       <td className="emirates-id-cell">{record.flatNumber || '-'}</td>
                       <td>
                         {fileUrl ? (
-                          fileAvailable ? (
-                            <div className="table-doc-actions">
-                              <a href={fileUrl} target="_blank" rel="noreferrer" className="cnic-scan-link">
-                                {record.fileName || 'Open PDF'}
-                              </a>
-                              <button type="button" className="table-save-btn" onClick={() => handleSaveDocument(record)}>
-                                Save PDF
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="cnic-scan-link" style={{ color: '#fca5a5' }}>File missing</span>
-                          )
+                          <div className="table-doc-actions">
+                            <a href={fileUrl} target="_blank" rel="noreferrer" className="cnic-scan-link">
+                              {record.fileName || 'Open PDF'}
+                            </a>
+                            <button type="button" className="table-save-btn" onClick={() => handleSaveDocument(record)}>
+                              Save PDF
+                            </button>
+                          </div>
                         ) : (
-                          '-'
-                        )}
+                          <span className="cnic-scan-link" style={{ color: '#fca5a5' }}>File missing</span>
+                          )
+                        
                       </td>
                       <td>{record.uploadedAt ? new Date(record.uploadedAt).toLocaleString() : '-'}</td>
                     </tr>

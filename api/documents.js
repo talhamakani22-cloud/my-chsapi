@@ -100,12 +100,14 @@ router.get('/', async (req, res) => {
     const normalized = records.map((record) => {
       const filePath = String(record.filePath || '');
       const storedFileName = String(record.storedFileName || filePath.split('/').pop() || '').trim();
-      const fileAvailable = storedFileName ? fs.existsSync(path.join(uploadDir, storedFileName)) : false;
+      const fileUrl = String(record.fileUrl || '').trim();
+      const isAbsoluteFileUrl = /^https?:\/\//i.test(fileUrl);
+      const fileAvailable = isAbsoluteFileUrl || (storedFileName ? fs.existsSync(path.join(uploadDir, storedFileName)) : false);
       const runtimeFileUrl = filePath ? `${req.protocol}://${req.get('host')}${filePath}` : '';
       return {
         ...record,
         fileAvailable,
-        fileUrl: runtimeFileUrl || record.fileUrl || '',
+        fileUrl: runtimeFileUrl || fileUrl || '',
       };
     });
 
