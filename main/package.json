@@ -1,0 +1,9 @@
+{
+  "name": "chs-cloudflare-build-shim",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "postinstall": "npm --prefix ../ clean-install --progress=false",
+    "build": "npm --prefix ../ run build"
+  }
+}
