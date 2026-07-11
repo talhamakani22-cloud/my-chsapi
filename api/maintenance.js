@@ -195,9 +195,10 @@ router.get('/report', async (req, res) => {
         const paymentSlipPath = String(stats.paymentSlipPath || '').trim()
           || (legacyUrl.startsWith('/uploads/') ? legacyUrl : '');
         const paymentSlipStoredFileName = String(stats.paymentSlipStoredFileName || paymentSlipPath.split('/').pop() || '').trim();
-        const paymentSlipAvailable = paymentSlipStoredFileName
+        const isAbsoluteSlipUrl = /^https?:\/\//i.test(legacyUrl);
+        const paymentSlipAvailable = isAbsoluteSlipUrl || (paymentSlipStoredFileName
           ? fs.existsSync(path.join(slipsUploadDir, paymentSlipStoredFileName))
-          : false;
+          : false);
         const paymentSlipUrl = paymentSlipPath
           ? `${req.protocol}://${req.get('host')}${paymentSlipPath}`
           : legacyUrl;
@@ -253,12 +254,14 @@ router.get('/report', async (req, res) => {
       const residentStatus = String(row.status || 'unread').toLowerCase();
       const paymentSlipPath = String(row.paymentSlipPath || '').trim();
       const paymentSlipStoredFileName = String(row.paymentSlipStoredFileName || paymentSlipPath.split('/').pop() || '').trim();
-      const paymentSlipAvailable = paymentSlipStoredFileName
+      const legacyUrl = String(row.paymentSlipUrl || '').trim();
+      const isAbsoluteSlipUrl = /^https?:\/\//i.test(legacyUrl);
+      const paymentSlipAvailable = isAbsoluteSlipUrl || (paymentSlipStoredFileName
         ? fs.existsSync(path.join(slipsUploadDir, paymentSlipStoredFileName))
-        : false;
+        : false);
       const paymentSlipUrl = paymentSlipPath
         ? `${req.protocol}://${req.get('host')}${paymentSlipPath}`
-        : String(row.paymentSlipUrl || '');
+        : legacyUrl;
 
       return {
         id: row.receiptId,
@@ -816,6 +819,9 @@ router.post('/upload-slip', uploadSlip.single('slipPdf'), async (req, res) => {
     const paidAt = new Date();
     let relativePath = '';
     let storedFileName = '';
+    let storedMimeType = '';
+    let storedDisplayName = '';
+    let storedSize = 0;
 
     // Handle JSON base64 upload
     if (slipImageBase64 && !req.file) {
@@ -849,10 +855,16 @@ router.post('/upload-slip', uploadSlip.single('slipPdf'), async (req, res) => {
       
       fs.writeFileSync(filePath, slipBuffer);
       relativePath = `/uploads/maintenance-slips/${storedFileName}`;
+      storedMimeType = slipImageMimeType || 'image/jpeg';
+      storedDisplayName = slipImageName || 'payment-slip.jpg';
+      storedSize = slipBuffer.length;
     } else if (req.file) {
       // Handle FormData file upload
       relativePath = `/uploads/maintenance-slips/${req.file.filename}`;
       storedFileName = req.file.filename;
+      storedMimeType = req.file.mimetype || 'application/octet-stream';
+      storedDisplayName = req.file.originalname || 'payment-slip';
+      storedSize = Number(req.file.size || 0);
     }
 
     const absoluteUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
@@ -863,10 +875,10 @@ router.post('/upload-slip', uploadSlip.single('slipPdf'), async (req, res) => {
         $set: {
           status: 'paid',
           paymentDate: paidAt,
-          paymentSlipName: slipImageName || req.file?.originalname || 'payment-slip',
+          paymentSlipName: storedDisplayName || 'payment-slip',
           paymentSlipStoredFileName: storedFileName,
-          paymentSlipMimeType: slipImageMimeType || req.file?.mimetype,
-          paymentSlipSize: slipImageBase64 ? Buffer.byteLength(slipImageBase64, 'base64') : req.file?.size,
+          paymentSlipMimeType: storedMimeType,
+          paymentSlipSize: storedSize,
           paymentSlipPath: relativePath,
           paymentSlipUrl: absoluteUrl,
           updatedAt: new Date(),
@@ -908,10 +920,10 @@ router.post('/upload-slip', uploadSlip.single('slipPdf'), async (req, res) => {
           overallStatus: nextStatus,
           amount: Number(receipt.amount || 0),
           paymentDate: paidAt,
-          paymentSlipName: req.file.originalname,
-          paymentSlipStoredFileName: req.file.filename,
-          paymentSlipMimeType: req.file.mimetype,
-          paymentSlipSize: req.file.size,
+          paymentSlipName: storedDisplayName || 'payment-slip',
+          paymentSlipStoredFileName: storedFileName,
+          paymentSlipMimeType: storedMimeType,
+          paymentSlipSize: storedSize,
           paymentSlipPath: relativePath,
           paymentSlipUrl: absoluteUrl,
           updatedAt: new Date(),
