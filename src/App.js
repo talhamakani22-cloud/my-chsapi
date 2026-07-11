@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import Report from './Report';
@@ -18,10 +18,10 @@ function App() {
   const normalizedLoginType = String(sessionUser?.loginType || '').toLowerCase().trim().replace(/[-_\s]+/g, '');
   const isReceptionLogin = normalizedLoginType === 'reception' || normalizedLoginType === 'receptiondesk';
 
-  const canAccessScreen = (targetScreen) => {
+  const canAccessScreen = useCallback((targetScreen) => {
     if (!isReceptionLogin) return true;
     return targetScreen === 'dashboard' || targetScreen === 'report' || targetScreen === 'family-details' || targetScreen === 'complaint-tracking';
-  };
+  }, [isReceptionLogin]);
 
   const renderDashboard = () => (
     <Dashboard
@@ -80,7 +80,7 @@ function App() {
     if (!canAccessScreen(screen)) {
       setScreen('dashboard');
     }
-  }, [isLoggedIn, screen, sessionUser]);
+  }, [isLoggedIn, screen, canAccessScreen]);
 
   if (!isLoggedIn) {
     return <Login onSignInSuccess={async () => {

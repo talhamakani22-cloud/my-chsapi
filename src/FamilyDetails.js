@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import './FamilyDetails.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
@@ -19,8 +19,6 @@ function FamilyDetails({
   const [editingRecord, setEditingRecord] = useState(null);
   const [editForm, setEditForm] = useState({ residentName: '', flatNumber: '', familyMembers: [] });
   const [savingEdit, setSavingEdit] = useState(false);
-  const isRecordActive = (record) => record?.isActive !== false;
-
   useEffect(() => {
     const user = localStorage.getItem('user');
     if (!user && onRequireLogin) {
@@ -28,7 +26,7 @@ function FamilyDetails({
     }
   }, [onRequireLogin]);
 
-  const fetchFamilyRecords = async () => {
+  const fetchFamilyRecords = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -50,7 +48,7 @@ function FamilyDetails({
       setError('Failed to fetch family details.');
     }
     setLoading(false);
-  };
+  }, [searchQuery, statusFilter]);
 
   useEffect(() => {
     fetchFamilyRecords();
@@ -62,7 +60,7 @@ function FamilyDetails({
     return () => {
       clearInterval(intervalId);
     };
-  }, [searchQuery, statusFilter]);
+  }, [fetchFamilyRecords]);
 
   const handleSearch = (e) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import './Report.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
@@ -24,7 +24,7 @@ function Documents({ onBackToDashboard, onRequireLogin }) {
     }
   }, [onRequireLogin]);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -44,13 +44,13 @@ function Documents({ onBackToDashboard, onRequireLogin }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery]);
 
   useEffect(() => {
     fetchDocuments();
     const intervalId = setInterval(fetchDocuments, 30000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [fetchDocuments]);
 
   const handleSearch = (e) => {
     e.preventDefault();

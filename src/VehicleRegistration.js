@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import './Report.css';
 import './VehicleRegistration.css';
 
@@ -27,7 +27,7 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
     }
   }, [onRequireLogin]);
 
-  const fetchVehicleRecords = async () => {
+  const fetchVehicleRecords = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -49,7 +49,7 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
       setError('Failed to fetch vehicle records.');
     }
     setLoading(false);
-  };
+  }, [searchQuery, statusFilter]);
 
   useEffect(() => {
     fetchVehicleRecords();
@@ -57,7 +57,7 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
       fetchVehicleRecords();
     }, 30000);
     return () => clearInterval(intervalId);
-  }, [searchQuery, statusFilter]);
+  }, [fetchVehicleRecords]);
 
   const parseRecordDate = (record) => {
     const source = record.uploadedAt || record.registrationDate;
@@ -66,12 +66,12 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   };
 
-  const getMonthKey = (record) => {
+  const getMonthKey = useCallback((record) => {
     const parsed = parseRecordDate(record);
     if (!parsed) return '';
     const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
     return `${parsed.getFullYear()}-${month}`;
-  };
+  }, []);
 
   const monthOptions = useMemo(() => {
     return Array.from({ length: currentMonthIndex + 1 }, (_, i) => {
@@ -136,7 +136,7 @@ function VehicleRegistration({ onBackToDashboard, onRequireLogin }) {
 
       return searchPass && statusPass && monthPass && startPass && endPass;
     });
-  }, [records, searchQuery, statusFilter, selectedMonth, startDate, endDate]);
+  }, [records, searchQuery, statusFilter, selectedMonth, startDate, endDate, getMonthKey]);
 
   const handleSearch = (e) => {
     e.preventDefault();

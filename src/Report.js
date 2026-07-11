@@ -146,7 +146,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
     setLoading(false);
   }, [searchQuery, startDate, endDate, onRequireLogin]);
 
-  const getMonthKey = (visitor) => {
+  const getMonthKey = useCallback((visitor) => {
     // Group by registration/entry time first so monthly report reflects actual visit month.
     const parsed =
       parseVisitorDate(visitor.createdAt) ||
@@ -156,7 +156,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
     if (!parsed) return '';
     const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
     return `${parsed.getFullYear()}-${month}`;
-  };
+  }, []);
 
   const monthOptions = useMemo(() => {
     return Array.from({ length: currentMonthIndex + 1 }, (_, i) => {
@@ -168,7 +168,7 @@ function Report({ onBackToDashboard, onRequireLogin }) {
   const filteredVisitors = useMemo(() => {
     if (!selectedMonth) return visitors;
     return visitors.filter((visitor) => getMonthKey(visitor) === selectedMonth);
-  }, [visitors, selectedMonth]);
+  }, [visitors, selectedMonth, getMonthKey]);
 
   useEffect(() => {
     fetchVisitors();
