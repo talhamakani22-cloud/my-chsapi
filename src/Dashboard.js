@@ -98,6 +98,61 @@ function Dashboard({ onNavigateToReport, onNavigateToFamilyDetails, onNavigateTo
 
   const maxVisitors = Math.max(...monthlyData.map((d) => d.visitors), 1);
 
+  const openComplaintQrForPrint = () => {
+    const qrImageUrl = `${window.location.origin}/qr-complaint-rec01-render.png`;
+    const printWindow = window.open('', '_blank', 'width=700,height=900');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Complain QR Code</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 24px;
+              font-family: Arial, sans-serif;
+              text-align: center;
+              color: #0f2233;
+            }
+            h2 { margin: 0 0 8px 0; }
+            p { margin: 0 0 16px 0; color: #334155; }
+            img {
+              width: 260px;
+              height: 260px;
+              object-fit: contain;
+              border: 1px solid #d1d5db;
+              padding: 10px;
+            }
+            .print-btn {
+              margin-top: 18px;
+              border: none;
+              border-radius: 10px;
+              padding: 10px 18px;
+              font-weight: 700;
+              background: #0ea5e9;
+              color: #fff;
+              cursor: pointer;
+            }
+            @media print {
+              .print-btn { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h2>Complain QR Code</h2>
+          <p>Scan to open complaint registration page</p>
+          <img src="${qrImageUrl}" alt="Complaint QR Code" />
+          <div>
+            <button class="print-btn" onclick="window.print()">Print QR</button>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="dashboard-container">
       <div className="bg-shapes">
@@ -271,6 +326,9 @@ function Dashboard({ onNavigateToReport, onNavigateToFamilyDetails, onNavigateTo
         </button>
         <button className="action-btn primary" onClick={onNavigateToComplaintTracking}>
           Complaint Tracking
+        </button>
+        <button className="action-btn qr-btn" onClick={openComplaintQrForPrint}>
+          Complain QR Code
         </button>
         {loading && <div style={{marginTop: 10}}>Loading...</div>}
         {error && <div style={{color: 'red', marginTop: 10}}>{error}</div>}
