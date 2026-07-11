@@ -56,6 +56,56 @@ function canViewAllDocuments(sessionUser = {}) {
   return role === 'admin' || loginType === 'committee';
 }
 
+function resolveDocumentFilePath(record = {}) {
+  const filePath = String(record.filePath || '').trim();
+  const storedFileName = String(record.storedFileName || filePath.split('/').pop() || '').trim();
+  if (!storedFileName) return '';
+  return path.join(uploadDir, storedFileName);
+}
+
+router.get('/:id/file', async (req, res) => {
+  try {
+    const access = getAccessScope(req);
+    if (!access.allowed) {
+      return res.status(access.status).json({ success: false, message: access.message });
+    }
+
+    if (access.scope === 'all' && !canViewAllDocuments(access.sessionUser)) {
+      return res.status(403).json({ success: false, message: 'Only committee head can view all uploaded documents.' });
+    }
+
+    const recordId = String(req.params.id || '').trim();
+    if (!mongoose.Types.ObjectId.isValid(recordId)) {
+      return res.status(400).json({ success: false, message: 'Invalid document id.' });
+    }
+
+    const db = mongoose.connection && mongoose.connection.db;
+    if (!db) {
+      throw new Error('Database connection is not ready.');
+    }
+
+    const query = { _id: new mongoose.Types.ObjectId(recordId), isActive: { $ne: false } };
+    if (access.scope === 'resident') {
+      query.flatNumber = { $regex: buildFlatScopedRegex(access.flatNumber) };
+    }
+
+    const record = await db.collection(DOCUMENTS_COLLECTION).findOne(query);
+    if (!record) {
+      return res.status(404).json({ success: false, message: 'Document not found.' });
+    }
+
+    const filePath = resolveDocumentFilePath(record);
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'File missing.' });
+    }
+
+    const downloadName = String(record.fileName || path.basename(filePath)).trim() || 'document.pdf';
+    return res.download(filePath, downloadName);
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Failed to download document.' });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const access = getAccessScope(req);

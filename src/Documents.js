@@ -126,15 +126,15 @@ function Documents({ onBackToDashboard, onRequireLogin }) {
   };
 
   const handleSaveDocument = async (record) => {
-    const fileUrl = buildFileUrl(record.filePath || record.fileUrl);
-    if (!fileUrl) return;
+    const downloadUrl = record?._id ? `${API_BASE_URL}/api/documents/${record._id}/file` : buildFileUrl(record.filePath || record.fileUrl);
+    if (!downloadUrl) return;
 
     const fallbackName = `document-${record.flatNumber || 'flat'}-${Date.now()}.pdf`;
     const rawName = String(record.fileName || fallbackName).trim();
     const fileName = rawName.toLowerCase().endsWith('.pdf') ? rawName : `${rawName}.pdf`;
 
     try {
-      const response = await fetch(fileUrl, { credentials: 'include' });
+      const response = await fetch(downloadUrl, { credentials: 'include' });
       if (!response.ok) {
         throw new Error('Download failed');
       }
@@ -149,7 +149,7 @@ function Documents({ onBackToDashboard, onRequireLogin }) {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch {
-      window.open(fileUrl, '_blank', 'noopener,noreferrer');
+      window.open(downloadUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -214,7 +214,7 @@ function Documents({ onBackToDashboard, onRequireLogin }) {
             <tbody>
               {records.length > 0 ? (
                 records.map((record) => {
-                  const fileUrl = buildFileUrl(record.filePath || record.fileUrl);
+                  const fileUrl = record?._id ? `${API_BASE_URL}/api/documents/${record._id}/file` : buildFileUrl(record.filePath || record.fileUrl);
                   return (
                     <tr key={String(record._id || `${record.flatNumber}-${record.uploadedAt}`)}>
                       <td className="name-en-cell">{record.ownerName || '-'}</td>
@@ -231,8 +231,7 @@ function Documents({ onBackToDashboard, onRequireLogin }) {
                           </div>
                         ) : (
                           <span className="cnic-scan-link" style={{ color: '#fca5a5' }}>File missing</span>
-                          )
-                        
+                        )}
                       </td>
                       <td>{record.uploadedAt ? new Date(record.uploadedAt).toLocaleString() : '-'}</td>
                     </tr>
