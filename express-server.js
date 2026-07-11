@@ -110,6 +110,10 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Express server is running!' });
 });
 
+app.get('/complaint/register', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'complaint-register.html'));
+});
+
 
 
 app.listen(PORT, () => {

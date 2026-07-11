@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Complaint Registration</title>
+    <style>
+      :root {
+        --bg-a: #0f2233;
+        --bg-b: #14324a;
+        --bg-c: #1b4564;
+        --card: rgba(255, 255, 255, 0.1);
+        --border: rgba(255, 255, 255, 0.2);
+        --text: #f7fbff;
+        --muted: #c3e2f7;
+        --accent: #58aee6;
+        --accent-dark: #2389c8;
+        --error: #fecaca;
+        --ok: #c7f9cc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--text);
+        background: radial-gradient(circle at top right, rgba(88, 174, 230, 0.28), transparent 40%),
+          linear-gradient(135deg, var(--bg-a), var(--bg-b) 50%, var(--bg-c));
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 18px;
+      }
+
+      .wrap {
+        width: min(780px, 100%);
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        backdrop-filter: blur(10px);
+        padding: 20px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.8rem;
+      }
+
+      .subtitle {
+        margin: 0 0 16px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .field.full {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        font-size: 0.9rem;
+        color: #dff3ff;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(15, 34, 51, 0.45);
+        color: var(--text);
+        outline: none;
+      }
+
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+
+      button {
+        border: none;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .primary {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .primary:hover {
+        background: var(--accent-dark);
+      }
+
+      .secondary {
+        background: rgba(88, 174, 230, 0.2);
+        color: #dff3ff;
+        border: 1px solid rgba(159, 215, 245, 0.6);
+      }
+
+      .result,
+      .error {
+        margin-top: 14px;
+        border-radius: 10px;
+        padding: 10px 12px;
+      }
+
+      .result {
+        background: rgba(34, 197, 94, 0.18);
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        color: var(--ok);
+      }
+
+      .error {
+        background: rgba(239, 68, 68, 0.2);
+        border: 1px solid rgba(239, 68, 68, 0.5);
+        color: var(--error);
+      }
+
+      .ticket {
+        margin-top: 8px;
+        display: inline-block;
+        font-size: 1.1rem;
+        font-weight: 800;
+      }
+
+      @media (max-width: 700px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .card {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <h1>Complaint Registration</h1>
+        <p class="subtitle">
+          Submit your complaint without sign-in. Keep the generated ticket number to track the latest status in the app.
+        </p>
+
+        <form id="complaintForm" enctype="multipart/form-data">
+          <div class="grid">
+            <div class="field">
+              <label for="locationCode">Location</label>
+              <input id="locationCode" name="loc" type="text" readonly />
+            </div>
+
+            <div class="field">
+              <label for="complaintType">Complaint Category</label>
+              <select id="complaintType" name="complaintType" required>
+                <option value="">Select category</option>
+                <option value="Housekeeping">Housekeeping</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Security">Security</option>
+                <option value="Parking">Parking</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="name">Name</label>
+              <input id="name" name="name" type="text" placeholder="Your name" required />
+            </div>
+
+            <div class="field">
+              <label for="phone">Phone Number</label>
+              <input id="phone" name="phone" type="text" placeholder="0321-2033366" required maxlength="12" inputmode="numeric" />
+            </div>
+
+            <div class="field">
+              <label for="flatNumber">Flat Number</label>
+              <input id="flatNumber" name="flatNumber" type="text" placeholder="A-12" required />
+            </div>
+
+            <div class="field full">
+              <label for="description">Complaint Description</label>
+              <textarea id="description" name="description" placeholder="Write complaint details" required></textarea>
+            </div>
+
+            <div class="field full">
+              <label for="complaintMedia">Attach Picture</label>
+              <input id="complaintMedia" name="complaintMedia" type="file" accept="image/*" required />
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="submitBtn" class="primary" type="submit">Submit Complaint</button>
+            <button id="copyBtn" class="secondary" type="button" disabled>Copy Ticket Number</button>
+          </div>
+        </form>
+
+        <div id="result" class="result" style="display: none;"></div>
+        <div id="error" class="error" style="display: none;"></div>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById('complaintForm');
+      const submitBtn = document.getElementById('submitBtn');
+      const copyBtn = document.getElementById('copyBtn');
+      const resultEl = document.getElementById('result');
+      const errorEl = document.getElementById('error');
+      const locationInput = document.getElementById('locationCode');
+      const nameInput = document.getElementById('name');
+      const phoneInput = document.getElementById('phone');
+      const flatInput = document.getElementById('flatNumber');
+      const complaintTypeInput = document.getElementById('complaintType');
+      const descriptionInput = document.getElementById('description');
+      const mediaInput = document.getElementById('complaintMedia');
+      let latestTicket = '';
+
+      const params = new URLSearchParams(window.location.search);
+      const locationCode = String(params.get('loc') || '').trim().toUpperCase();
+      locationInput.value = locationCode || 'GENERAL';
+
+      function formatPakistanPhone(value) {
+        const digits = String(value || '').replace(/\D/g, '').slice(0, 11);
+        if (digits.length <= 4) return digits;
+        return digits.slice(0, 4) + '-' + digits.slice(4);
+      }
+
+      function isValidPakistanPhone(value) {
+        const digits = String(value || '').replace(/\D/g, '');
+        return /^03\d{9}$/.test(digits);
+      }
+
+      function formatFlatNumber(value) {
+        const cleaned = String(value || '').toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9-]/g, '');
+        const normalized = cleaned.replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+        const match = normalized.match(/^([A-Z]+)(\d+)$/);
+        if (match) return match[1] + '-' + match[2];
+        return normalized;
+      }
+
+      function isValidFlatNumber(value) {
+        return /^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(String(value || ''));
+      }
+
+      phoneInput.addEventListener('input', () => {
+        phoneInput.value = formatPakistanPhone(phoneInput.value);
+      });
+
+      flatInput.addEventListener('input', () => {
+        flatInput.value = formatFlatNumber(flatInput.value);
+      });
+
+      function showError(message) {
+        errorEl.style.display = 'block';
+        resultEl.style.display = 'none';
+        errorEl.textContent = message;
+      }
+
+      function showSuccess(ticketNo) {
+        resultEl.style.display = 'block';
+        errorEl.style.display = 'none';
+        resultEl.innerHTML = [
+          'Your complaint has been registered successfully.',
+          '<br />',
+          '<span class="ticket">Ticket Number: ' + ticketNo + '</span>',
+          '<br />',
+          'You can track progress from the Complaint Tracking section in the mobile application.',
+        ].join('');
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+        errorEl.style.display = 'none';
+        resultEl.style.display = 'none';
+
+        try {
+          const trimmedName = String(nameInput.value || '').trim();
+          const phone = formatPakistanPhone(phoneInput.value);
+          const flatNumber = formatFlatNumber(flatInput.value);
+          const complaintType = String(complaintTypeInput.value || '').trim();
+          const description = String(descriptionInput.value || '').trim();
+          const selectedMedia = mediaInput.files && mediaInput.files[0];
+
+          if (!trimmedName) {
+            throw new Error('Name is required.');
+          }
+
+          if (!isValidPakistanPhone(phone)) {
+            throw new Error('Phone number must be in format 03XXXXXXXXX (example: 0321-2033366).');
+          }
+
+          if (!flatNumber || !isValidFlatNumber(flatNumber)) {
+            throw new Error('Valid flat number is required (example: A-12).');
+          }
+
+          if (!complaintType) {
+            throw new Error('Complaint category is required.');
+          }
+
+          if (!description || description.length < 10) {
+            throw new Error('Complaint description must be at least 10 characters.');
+          }
+
+          if (!selectedMedia) {
+            throw new Error('Please upload a picture.');
+          }
+
+          nameInput.value = trimmedName;
+          phoneInput.value = phone;
+          flatInput.value = flatNumber;
+
+          const formData = new FormData(form);
+          formData.set('loc', locationInput.value || 'GENERAL');
+
+          const res = await fetch('/api/complaints/register', {
+            method: 'POST',
+            body: formData,
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || 'Failed to register complaint.');
+          }
+
+          latestTicket = String(data.ticketNo || data?.row?.ticketNo || '');
+          if (!latestTicket) {
+            throw new Error('Ticket number was not generated.');
+          }
+
+          showSuccess(latestTicket);
+          copyBtn.disabled = false;
+          form.reset();
+          locationInput.value = locationCode || 'GENERAL';
+        } catch (err) {
+          showError(err.message || 'Failed to register complaint.');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Complaint';
+        }
+      });
+
+      copyBtn.addEventListener('click', async () => {
+        if (!latestTicket) return;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(latestTicket);
+            copyBtn.textContent = 'Copied';
+          } else {
+            copyBtn.textContent = latestTicket;
+          }
+          setTimeout(() => {
+            copyBtn.textContent = 'Copy Ticket Number';
+          }, 1200);
+        } catch {
+          copyBtn.textContent = latestTicket;
+        }
+      });
+    </script>
+  </body>
+</html>

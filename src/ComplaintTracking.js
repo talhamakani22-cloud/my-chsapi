@@ -8,9 +8,11 @@ const normalizeStatus = (value = '') => String(value).trim().toLowerCase();
 
 const statusProgress = (status = '') => {
   const normalized = normalizeStatus(status);
-  if (normalized === 'open') return 25;
-  if (normalized === 'in progress') return 60;
-  if (normalized === 'resolved') return 85;
+  if (normalized === 'registered') return 15;
+  if (normalized === 'under review') return 35;
+  if (normalized === 'assigned') return 50;
+  if (normalized === 'in progress') return 70;
+  if (normalized === 'resolved') return 90;
   if (normalized === 'closed') return 100;
   return 10;
 };
@@ -28,8 +30,9 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [editingId, setEditingId] = useState('');
-  const [editStatus, setEditStatus] = useState('Open');
+  const [editStatus, setEditStatus] = useState('Registered');
   const [editStatusNote, setEditStatusNote] = useState('');
+  const [editAssignedTo, setEditAssignedTo] = useState('');
   const [savingStatusId, setSavingStatusId] = useState('');
   const [expandedId, setExpandedId] = useState('');
 
@@ -76,14 +79,16 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
 
   const startEdit = (row) => {
     setEditingId(String(row._id || row.id || ''));
-    setEditStatus(String(row.status || 'Open'));
+    setEditStatus(String(row.status || 'Registered'));
     setEditStatusNote(String(row.statusNote || ''));
+    setEditAssignedTo(String(row.assignedTo || ''));
   };
 
   const cancelEdit = () => {
     setEditingId('');
-    setEditStatus('Open');
+    setEditStatus('Registered');
     setEditStatusNote('');
+    setEditAssignedTo('');
   };
 
   const saveStatus = async (complaintId) => {
@@ -97,7 +102,7 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ status: editStatus, statusNote: editStatusNote }),
+        body: JSON.stringify({ status: editStatus, statusNote: editStatusNote, assignedTo: editAssignedTo }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -247,7 +252,9 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
           onChange={(e) => setStatusFilter(e.target.value)}
         >
           <option value="all">All Statuses</option>
-          <option value="open">Open</option>
+          <option value="registered">Registered</option>
+          <option value="under review">Under Review</option>
+          <option value="assigned">Assigned</option>
           <option value="in progress">In Progress</option>
           <option value="resolved">Resolved</option>
           <option value="closed">Closed</option>
@@ -280,9 +287,9 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
                 </div>
 
                 <div className="complaint-card-meta">
-                  <span>Flat: {row.flatNumber || '-'}</span>
+                  <span>Location: {row.locationLabel || row.locationCode || row.flatNumber || '-'}</span>
                   <span>Type: {row.complaintType || 'General'}</span>
-                  <span>By: {row.sender?.email || '-'}</span>
+                  <span>By: {row.sender?.name || row.sender?.email || row.sender?.phone || '-'}</span>
                 </div>
 
                 <p className="complaint-description">{row.description || '-'}</p>
@@ -295,6 +302,16 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
                 <div className="complaint-status-note">
                   <strong>Follow-up Note:</strong> {row.statusNote || 'No note added yet.'}
                 </div>
+                <div className="complaint-status-note">
+                  <strong>Assigned To:</strong> {row.assignedTo || '-'}
+                </div>
+                {row.residentResolutionRequested ? (
+                  <div className="complaint-status-note">
+                    <strong>Resident Message:</strong> {row.residentResolutionMessage || '-'}
+                    <br />
+                    <strong>Sent At:</strong> {formatDateTime(row.residentResolutionAt)}
+                  </div>
+                ) : null}
 
                 <div className="complaint-view-details-wrap">
                   <button
@@ -310,13 +327,18 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
                     <div className="complaint-details-grid">
                       <div><strong>Ticket:</strong> {row.ticketNo || '-'}</div>
                       <div><strong>Flat:</strong> {row.flatNumber || '-'}</div>
+                      <div><strong>Location:</strong> {row.locationLabel || row.locationCode || '-'}</div>
                       <div><strong>Type:</strong> {row.complaintType || 'General'}</div>
                       <div><strong>Status:</strong> {row.status || '-'}</div>
-                      <div><strong>Raised By:</strong> {row.sender?.email || '-'}</div>
+                      <div><strong>Assigned To:</strong> {row.assignedTo || '-'}</div>
+                      <div><strong>Resident Resolution Flag:</strong> {row.residentResolutionRequested ? 'Yes' : 'No'}</div>
+                      <div><strong>Resident Message Time:</strong> {formatDateTime(row.residentResolutionAt)}</div>
+                      <div><strong>Raised By:</strong> {row.sender?.name || row.sender?.email || row.sender?.phone || '-'}</div>
                       <div><strong>Sender Role:</strong> {row.sender?.loginType || row.sender?.role || '-'}</div>
                       <div><strong>Created:</strong> {formatDateTime(row.createdAt)}</div>
                       <div><strong>Updated:</strong> {formatDateTime(row.updatedAt)}</div>
                       <div><strong>Media Type:</strong> {row.mediaMimeType || '-'}</div>
+                      <div><strong>Resident Message:</strong> {row.residentResolutionMessage || '-'}</div>
                     </div>
                     {hasMedia ? (
                       <div className="complaint-media-wrap">
@@ -351,11 +373,19 @@ function ComplaintTracking({ onBackToDashboard, onRequireLogin }) {
                           value={editStatus}
                           onChange={(e) => setEditStatus(e.target.value)}
                         >
-                          <option value="Open">Open</option>
+                          <option value="Registered">Registered</option>
+                          <option value="Under Review">Under Review</option>
+                          <option value="Assigned">Assigned</option>
                           <option value="In Progress">In Progress</option>
                           <option value="Resolved">Resolved</option>
                           <option value="Closed">Closed</option>
                         </select>
+                        <input
+                          className="complaint-inline-input"
+                          value={editAssignedTo}
+                          onChange={(e) => setEditAssignedTo(e.target.value)}
+                          placeholder="Assigned to"
+                        />
                         <input
                           className="complaint-inline-input"
                           value={editStatusNote}
