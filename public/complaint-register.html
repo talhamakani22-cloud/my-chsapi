@@ -104,6 +104,10 @@
         margin-top: 14px;
       }
 
+      .action-wide {
+        width: 100%;
+      }
+
       button {
         border: none;
         border-radius: 10px;
@@ -151,6 +155,41 @@
         display: inline-block;
         font-size: 1.1rem;
         font-weight: 800;
+      }
+
+      .track-panel {
+        margin-top: 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(15, 34, 51, 0.35);
+      }
+
+      .track-panel-title {
+        margin: 0 0 8px;
+        font-size: 1rem;
+        color: #dff3ff;
+      }
+
+      .track-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .track-row input {
+        flex: 1;
+        min-width: 220px;
+      }
+
+      .track-result {
+        margin-top: 10px;
+        border-radius: 10px;
+        border: 1px solid rgba(159, 215, 245, 0.35);
+        background: rgba(15, 34, 51, 0.45);
+        padding: 10px 12px;
+        color: #dff3ff;
+        line-height: 1.5;
       }
 
       @media (max-width: 700px) {
@@ -218,10 +257,23 @@
           </div>
 
           <div class="actions">
+            <button id="trackToggleBtn" class="secondary action-wide" type="button">Track Complaint</button>
+          </div>
+
+          <div class="actions">
             <button id="submitBtn" class="primary" type="submit">Submit Complaint</button>
             <button id="copyBtn" class="secondary" type="button" disabled>Copy Ticket Number</button>
           </div>
         </form>
+
+        <div id="trackPanel" class="track-panel" style="display: none;">
+          <h2 class="track-panel-title">Track Complaint by Ticket Number</h2>
+          <div class="track-row">
+            <input id="trackTicketNo" type="text" placeholder="Enter ticket number (example: CMP-20260711-00125)" />
+            <button id="trackBtn" class="primary" type="button">Track</button>
+          </div>
+          <div id="trackResult" class="track-result" style="display: none;"></div>
+        </div>
 
         <div id="result" class="result" style="display: none;"></div>
         <div id="error" class="error" style="display: none;"></div>
@@ -232,6 +284,11 @@
       const form = document.getElementById('complaintForm');
       const submitBtn = document.getElementById('submitBtn');
       const copyBtn = document.getElementById('copyBtn');
+      const trackToggleBtn = document.getElementById('trackToggleBtn');
+      const trackPanel = document.getElementById('trackPanel');
+      const trackBtn = document.getElementById('trackBtn');
+      const trackTicketInput = document.getElementById('trackTicketNo');
+      const trackResultEl = document.getElementById('trackResult');
       const resultEl = document.getElementById('result');
       const errorEl = document.getElementById('error');
       const locationInput = document.getElementById('locationCode');
@@ -292,8 +349,53 @@
           '<br />',
           '<span class="ticket">Ticket Number: ' + ticketNo + '</span>',
           '<br />',
-          'You can track progress from the Complaint Tracking section in the mobile application.',
+          'Use the Track Complaint button below to check status by ticket number.',
         ].join('');
+      }
+
+      function renderTrackResult(row) {
+        const created = row.createdAt ? new Date(row.createdAt).toLocaleString() : '-';
+        const updated = row.updatedAt ? new Date(row.updatedAt).toLocaleString() : '-';
+        trackResultEl.innerHTML = [
+          '<strong>Ticket:</strong> ' + (row.ticketNo || '-') + '<br />',
+          '<strong>Status:</strong> ' + (row.status || '-') + '<br />',
+          '<strong>Category:</strong> ' + (row.complaintType || 'General') + '<br />',
+          '<strong>Flat Number:</strong> ' + (row.flatNumber || '-') + '<br />',
+          '<strong>Location:</strong> ' + (row.locationLabel || row.locationCode || '-') + '<br />',
+          '<strong>Assigned To:</strong> ' + (row.assignedTo || '-') + '<br />',
+          '<strong>Remarks:</strong> ' + (row.statusNote || 'No remarks yet.') + '<br />',
+          '<strong>Created On:</strong> ' + created + '<br />',
+          '<strong>Last Updated:</strong> ' + updated,
+        ].join('');
+        trackResultEl.style.display = 'block';
+      }
+
+      async function trackComplaintByTicket() {
+        const ticketNo = String(trackTicketInput.value || '').trim().toUpperCase();
+        if (!ticketNo) {
+          showError('Please enter a ticket number to track your complaint.');
+          return;
+        }
+
+        trackBtn.disabled = true;
+        trackBtn.textContent = 'Tracking...';
+        errorEl.style.display = 'none';
+        trackResultEl.style.display = 'none';
+
+        try {
+          const res = await fetch('/api/complaints/track/' + encodeURIComponent(ticketNo));
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || 'Ticket not found.');
+          }
+
+          renderTrackResult(data.complaint || {});
+        } catch (err) {
+          showError(err.message || 'Failed to track complaint.');
+        } finally {
+          trackBtn.disabled = false;
+          trackBtn.textContent = 'Track';
+        }
       }
 
       form.addEventListener('submit', async (event) => {
@@ -358,6 +460,9 @@
 
           showSuccess(latestTicket);
           copyBtn.disabled = false;
+          trackPanel.style.display = 'block';
+          trackTicketInput.value = latestTicket;
+          trackResultEl.style.display = 'none';
           form.reset();
           locationInput.value = locationCode || 'GENERAL';
         } catch (err) {
@@ -382,6 +487,26 @@
           }, 1200);
         } catch {
           copyBtn.textContent = latestTicket;
+        }
+      });
+
+      trackToggleBtn.addEventListener('click', () => {
+        const shouldOpen = trackPanel.style.display === 'none';
+        trackPanel.style.display = shouldOpen ? 'block' : 'none';
+        if (shouldOpen) {
+          trackTicketInput.focus();
+          if (latestTicket && !trackTicketInput.value) {
+            trackTicketInput.value = latestTicket;
+          }
+        }
+      });
+
+      trackBtn.addEventListener('click', trackComplaintByTicket);
+
+      trackTicketInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          trackComplaintByTicket();
         }
       });
     </script>
