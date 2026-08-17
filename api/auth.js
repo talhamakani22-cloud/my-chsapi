@@ -226,7 +226,7 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Email and password are required.' });
   }
 
-  if (!loginType || !['reception', 'resident', 'committee'].includes(loginType)) {
+  if (!loginType || !['reception'].includes(loginType)) {
     return res.status(400).json({ success: false, message: 'Please select a valid login type.' });
   }
 
@@ -277,62 +277,6 @@ router.post('/login', async (req, res) => {
       console.log('[LOGIN SUCCESS] reception', normalizedEmail);
       return res.json({ success: true, user });
     }
-
-    if (loginType === 'resident') {
-      const residentLogin = await verifyCollectionLogin({
-        collectionName: 'resident',
-        normalizedEmail,
-        password,
-        fallbackRole: 'user',
-      });
-
-      if (!residentLogin.ok) {
-        console.log('[LOGIN FAIL] resident invalid credentials for:', normalizedEmail);
-        return res.status(401).json({ success: false, message: 'Invalid credentials' });
-      }
-
-      const residentUser = residentLogin.user || {
-        _id: residentLogin.record.userId || residentLogin.record._id,
-        email: residentLogin.record.email || normalizedEmail,
-        role: 'user',
-        name: residentLogin.record.name || residentLogin.record.username || '',
-      };
-
-      const residentFlatNumber = extractFlatNumberForResident(residentLogin.record, residentUser.email || normalizedEmail);
-
-      req.session.user = {
-        email: residentUser.email,
-        id: residentUser._id,
-        role: 'user',
-        loginType,
-        flatNumber: residentFlatNumber,
-      };
-      console.log('[LOGIN SUCCESS] resident', normalizedEmail);
-      return res.json({ success: true, user: { ...residentUser, flatNumber: residentFlatNumber } });
-    }
-
-    const committeeLogin = await verifyCollectionLogin({
-      collectionName: 'committee',
-      normalizedEmail,
-      password,
-      fallbackRole: 'admin',
-    });
-
-    if (!committeeLogin.ok) {
-      console.log('[LOGIN FAIL] committee invalid credentials for:', normalizedEmail);
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
-
-    const committeeUser = committeeLogin.user || {
-      _id: committeeLogin.record.userId || committeeLogin.record._id,
-      email: committeeLogin.record.email || normalizedEmail,
-      role: 'admin',
-      name: committeeLogin.record.name || 'Committee Head',
-    };
-
-    req.session.user = { email: committeeUser.email, id: committeeUser._id, role: 'admin', loginType };
-    console.log('[LOGIN SUCCESS] committee', normalizedEmail);
-    return res.json({ success: true, user: committeeUser });
 
   } catch (err) {
     console.error('[LOGIN ERROR]', err);

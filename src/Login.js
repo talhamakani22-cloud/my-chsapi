@@ -4,7 +4,7 @@ import './Login.css';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'https://my-chsapi.onrender.com';
 
 function Login({ onSignInSuccess }) {
-  const [form, setForm] = useState({ email: '', password: '', loginType: 'resident' });
+  const [form, setForm] = useState({ email: '', password: '', loginType: 'reception' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,7 +59,7 @@ function Login({ onSignInSuccess }) {
         onSignInSuccess();
       } else {
         if (response.status === 403 && data?.suggestedLoginType) {
-          setForm((prev) => ({ ...prev, loginType: data.suggestedLoginType }));
+            setForm((prev) => ({ ...prev, loginType: 'reception' }));
         }
         setError(data.message || 'Invalid email or password.');
       }
@@ -100,20 +100,6 @@ function Login({ onSignInSuccess }) {
                 onClick={() => setForm((prev) => ({ ...prev, loginType: 'reception' }))}
               >
                 Reception Desk
-              </button>
-              <button
-                type="button"
-                className={`role-option ${form.loginType === 'resident' ? 'active' : ''}`}
-                onClick={() => setForm((prev) => ({ ...prev, loginType: 'resident' }))}
-              >
-                Resident
-              </button>
-              <button
-                type="button"
-                className={`role-option ${form.loginType === 'committee' ? 'active' : ''}`}
-                onClick={() => setForm((prev) => ({ ...prev, loginType: 'committee' }))}
-              >
-                Committee Head
               </button>
             </div>
           </div>
