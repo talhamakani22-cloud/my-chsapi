@@ -23,35 +23,14 @@ function getAccessScope(req, options = {}) {
   const role = String(sessionUser.role || '').toLowerCase();
   const loginType = String(sessionUser.loginType || '').toLowerCase();
 
-  if (role === 'admin' || role === 'manager' || loginType === 'committee' || loginType === 'reception') {
+  if (role === 'manager' || loginType === 'reception' || role === 'admin') {
     return { allowed: true, scope: 'all', sessionUser };
-  }
-
-  if (role === 'user' || loginType === 'resident') {
-    if (allowResidentAll) {
-      return { allowed: true, scope: 'all', sessionUser };
-    }
-
-    const flatNumber = String(sessionUser.flatNumber || extractFlatNumberFromEmail(sessionUser.email) || '').trim();
-    if (!flatNumber) {
-      if (allowResidentWithoutFlat) {
-        return { allowed: true, scope: 'all', sessionUser };
-      }
-      return {
-        allowed: false,
-        status: 403,
-        message: 'Resident profile is missing a valid flat number in email.',
-        scope: 'none',
-      };
-    }
-
-    return { allowed: true, scope: 'resident', flatNumber, sessionUser };
   }
 
   return {
     allowed: false,
     status: 403,
-    message: 'You are not authorized to access this data.',
+    message: 'Only the reception desk is authorized to access this data.',
     scope: 'none',
   };
 }

@@ -15,22 +15,14 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [sessionUser, setSessionUser] = useState(null);
 
-  const normalizedLoginType = String(sessionUser?.loginType || '').toLowerCase().trim().replace(/[-_\s]+/g, '');
-  const isReceptionLogin = normalizedLoginType === 'reception' || normalizedLoginType === 'receptiondesk';
-
-  const canAccessScreen = useCallback((targetScreen) => {
-    if (!isReceptionLogin) return true;
-    return targetScreen === 'dashboard' || targetScreen === 'report' || targetScreen === 'family-details' || targetScreen === 'complaint-tracking';
-  }, [isReceptionLogin]);
-
   const renderDashboard = () => (
     <Dashboard
       onNavigateToReport={() => setScreen('report')}
-      onNavigateToFamilyDetails={() => canAccessScreen('family-details') && setScreen('family-details')}
-      onNavigateToVehicleRegistration={() => canAccessScreen('vehicle-registration') && setScreen('vehicle-registration')}
-      onNavigateToERecipets={() => canAccessScreen('e-recipets') && setScreen('e-recipets')}
-      onNavigateToDocuments={() => canAccessScreen('documents') && setScreen('documents')}
-      onNavigateToComplaintTracking={() => canAccessScreen('complaint-tracking') && setScreen('complaint-tracking')}
+      onNavigateToFamilyDetails={() => setScreen('family-details')}
+      onNavigateToVehicleRegistration={() => setScreen('vehicle-registration')}
+      onNavigateToERecipets={() => setScreen('e-recipets')}
+      onNavigateToDocuments={() => setScreen('documents')}
+      onNavigateToComplaintTracking={() => setScreen('complaint-tracking')}
       sessionUser={sessionUser}
       onLogout={handleLogout}
     />
@@ -77,10 +69,10 @@ function App() {
 
   useEffect(() => {
     if (!isLoggedIn) return;
-    if (!canAccessScreen(screen)) {
+    if (!screen) {
       setScreen('dashboard');
     }
-  }, [isLoggedIn, screen, canAccessScreen]);
+  }, [isLoggedIn, screen]);
 
   if (!isLoggedIn) {
     return <Login onSignInSuccess={async () => {
@@ -109,37 +101,22 @@ function App() {
   }
 
   if (screen === 'family-details') {
-    if (!canAccessScreen('family-details')) {
-      return renderDashboard();
-    }
     return <FamilyDetails onBackToDashboard={() => setScreen('dashboard')} onRequireLogin={handleLogout} />;
   }
 
   if (screen === 'vehicle-registration') {
-    if (!canAccessScreen('vehicle-registration')) {
-      return renderDashboard();
-    }
     return <VehicleRegistration onBackToDashboard={() => setScreen('dashboard')} onRequireLogin={handleLogout} />;
   }
 
   if (screen === 'e-recipets') {
-    if (!canAccessScreen('e-recipets')) {
-      return renderDashboard();
-    }
     return <ERecipets onBackToDashboard={() => setScreen('dashboard')} onRequireLogin={handleLogout} />;
   }
 
   if (screen === 'documents') {
-    if (!canAccessScreen('documents')) {
-      return renderDashboard();
-    }
     return <Documents onBackToDashboard={() => setScreen('dashboard')} onRequireLogin={handleLogout} />;
   }
 
   if (screen === 'complaint-tracking') {
-    if (!canAccessScreen('complaint-tracking')) {
-      return renderDashboard();
-    }
     return <ComplaintTracking onBackToDashboard={() => setScreen('dashboard')} onRequireLogin={handleLogout} />;
   }
 

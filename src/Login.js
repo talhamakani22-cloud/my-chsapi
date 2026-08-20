@@ -92,19 +92,6 @@ function Login({ onSignInSuccess }) {
 
         <form className="login-form" onSubmit={handleSubmit} noValidate>
           <div className="input-group">
-            <label className="input-label" htmlFor="loginType">Login as</label>
-            <div className="role-switch" role="radiogroup" aria-label="Login role">
-              <button
-                type="button"
-                className={`role-option ${form.loginType === 'reception' ? 'active' : ''}`}
-                onClick={() => setForm((prev) => ({ ...prev, loginType: 'reception' }))}
-              >
-                Reception Desk
-              </button>
-            </div>
-          </div>
-
-          <div className="input-group">
             <label className="input-label" htmlFor="email">Email address</label>
             <div className="input-wrapper">
               <span className="input-icon">

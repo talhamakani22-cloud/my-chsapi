@@ -62,7 +62,7 @@ function getLoginType(req) {
 
 function isMeetingChatAllowed(req) {
   const loginType = getLoginType(req);
-  return loginType === 'resident' || loginType === 'committee';
+  return loginType === 'reception';
 }
 
 function resolveSenderName(sessionUser) {

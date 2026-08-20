@@ -122,9 +122,41 @@ async function verifyCollectionLogin({ collectionName, normalizedEmail, password
   }
 
   const collection = db.collection(collectionName);
-  const record = await collection.findOne({ email: normalizedEmail });
+  let record = await collection.findOne({ email: normalizedEmail });
+
   if (!record) {
-    return { ok: false };
+    const fallbackUser = await User.findOne({ email: normalizedEmail, role: fallbackRole });
+    if (!fallbackUser) {
+      return { ok: false };
+    }
+
+    const isFallbackPasswordMatch = await fallbackUser.comparePassword(password);
+    if (!isFallbackPasswordMatch) {
+      return { ok: false };
+    }
+
+    await collection.updateOne(
+      { email: normalizedEmail },
+      {
+        $set: {
+          userId: fallbackUser._id,
+          email: normalizedEmail,
+          role: fallbackRole,
+          active: true,
+          passwordHash: fallbackUser.password,
+          name: fallbackUser.name || fallbackUser.username || '',
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          createdAt: new Date(),
+          username: normalizedEmail.split('@')[0],
+        },
+      },
+      { upsert: true }
+    );
+
+    record = await collection.findOne({ email: normalizedEmail });
+    return { ok: true, record, user: fallbackUser };
   }
 
   if (record.passwordHash) {
@@ -167,31 +199,11 @@ async function verifyCollectionLogin({ collectionName, normalizedEmail, password
 }
 
 function getSignupTarget(signupMode) {
-  if (signupMode === 'resident-self') {
-    return { collectionName: 'resident', role: 'user', successMessage: 'Resident account registered successfully.' };
-  }
-
-  if (signupMode === 'reception-self') {
-    return { collectionName: 'reception', role: 'manager', successMessage: 'Reception account registered successfully.' };
-  }
-
-  if (signupMode === 'committee-self') {
-    return { collectionName: 'committee', role: 'admin', successMessage: 'Committee account registered successfully.' };
-  }
-
-  return { collectionName: 'resident', role: 'user', successMessage: 'Resident credentials created successfully.' };
+  return { collectionName: 'reception', role: 'manager', successMessage: 'Reception account registered successfully.' };
 }
 
 function getAuthTarget(loginType) {
-  if (loginType === 'reception') {
-    return { collectionName: 'reception', role: 'manager' };
-  }
-
-  if (loginType === 'committee') {
-    return { collectionName: 'committee', role: 'admin' };
-  }
-
-  return { collectionName: 'resident', role: 'user' };
+  return { collectionName: 'reception', role: 'manager' };
 }
 
 function normalizeVehicleNumberKey(value = '') {
@@ -284,136 +296,12 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST signup route - committee head can create resident credentials
-router.post('/signup', async (req, res) => {
-  const {
-    username,
-    email,
-    password,
-    signupMode,
-    committeeEmail,
-    committeePassword,
-  } = req.body;
-
-  if (!username || !email || !password) {
-    return res.status(400).json({ success: false, message: 'All fields are required.' });
-  }
-
-  const residentEmailPattern = /^[a-z]+(?:[._-]?[a-z]+)*\d+@chs\.com$/i;
-  const residentUsernamePattern = /^[a-z]+(?:_[a-z]+)*_\d+$/i;
-
-  if (!residentEmailPattern.test(String(email).trim())) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email must be like name + apartment number @chs.com (e.g., ali123@chs.com).',
-    });
-  }
-
-  if (!residentUsernamePattern.test(String(username).trim())) {
-    return res.status(400).json({
-      success: false,
-      message: 'Username must be like name_flatnumber (e.g., ali_123).',
-    });
-  }
-
-  const normalizedEmail = String(email).trim().toLowerCase();
-  const normalizedUsername = String(username).trim().toLowerCase();
-
-  const emailPartsMatch = normalizedEmail.match(/^([a-z._-]+?)(\d+)@chs\.com$/i);
-  const usernamePartsMatch = normalizedUsername.match(/^([a-z_]+)_(\d+)$/i);
-
-  if (!emailPartsMatch || !usernamePartsMatch) {
-    return res.status(400).json({ success: false, message: 'Invalid resident email or username format.' });
-  }
-
-  const emailName = emailPartsMatch[1].replace(/[._-]/g, '');
-  const emailFlat = emailPartsMatch[2];
-  const usernameName = usernamePartsMatch[1].replace(/_/g, '');
-  const usernameFlat = usernamePartsMatch[2];
-
-  if (emailName !== usernameName || emailFlat !== usernameFlat) {
-    return res.status(400).json({
-      success: false,
-      message: 'Name and flat number must match in both email and username.',
-    });
-  }
-
-  if (password.length < 6) {
-    return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
-  }
-
-  try {
-    const { collectionName, role, successMessage } = getSignupTarget(signupMode);
-    const isSelfSignup = ['resident-self', 'reception-self', 'committee-self'].includes(signupMode);
-
-    if (!isSelfSignup) {
-      if (!committeeEmail || !committeePassword) {
-        return res.status(400).json({ success: false, message: 'Committee credentials are required.' });
-      }
-
-      const committeeUser = await User.findOne({ email: committeeEmail.toLowerCase().trim() });
-      if (!committeeUser) {
-        return res.status(403).json({ success: false, message: 'Only committee head can create resident credentials.' });
-      }
-
-      const committeePasswordMatch = await committeeUser.comparePassword(committeePassword);
-      if (!committeePasswordMatch || committeeUser.role !== 'admin') {
-        return res.status(403).json({ success: false, message: 'Invalid committee head credentials.' });
-      }
-    }
-
-    const existingUser = await User.findOne({ email: normalizedEmail });
-    if (existingUser) {
-      return res.status(409).json({ success: false, message: 'A user with this email already exists.' });
-    }
-
-    const newResident = await User.create({
-      name: username.trim(),
-      email: normalizedEmail,
-      password,
-      role,
-      isActive: true,
-    });
-
-    try {
-      const roleCollection = mongoose.connection.db.collection(collectionName);
-      await roleCollection.updateOne(
-        { email: normalizedEmail },
-        {
-          $set: {
-            userId: newResident._id,
-            username: normalizedUsername,
-            email: normalizedEmail,
-            name: username.trim(),
-            role,
-            active: true,
-            passwordHash: newResident.password,
-            updatedAt: new Date(),
-          },
-          $setOnInsert: {
-            createdAt: new Date(),
-          },
-        },
-        { upsert: true }
-      );
-    } catch (residentErr) {
-      await User.deleteOne({ _id: newResident._id }).catch(() => {});
-      console.error('[RESIDENT COLLECTION WRITE ERROR]', residentErr);
-      return res.status(500).json({
-        success: false,
-        message: 'Could not complete resident registration. Please try again.',
-      });
-    }
-
-    return res.status(201).json({
-      success: true,
-      message: successMessage,
-      user: newResident,
-    });
-  } catch (err) {
-    console.error('[SIGNUP ERROR]', err);
-    return res.status(500).json({ success: false, message: 'Server error.' });
-  }
+// Signup requests are disabled for this deployment.
+router.post('/signup', async (_req, res) => {
+  return res.status(403).json({
+    success: false,
+    message: 'Account creation is disabled. Please use the reception login flow only.',
+  });
 });
 
 router.post('/reset-password', async (req, res) => {
@@ -432,7 +320,7 @@ router.post('/reset-password', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Passwords do not match.' });
   }
 
-  if (!['reception', 'resident', 'committee'].includes(loginType)) {
+  if (!['reception'].includes(loginType)) {
     return res.status(400).json({ success: false, message: 'Please select a valid login type.' });
   }
 
@@ -492,7 +380,7 @@ router.get('/profile', async (req, res) => {
   }
 
   try {
-    const { collectionName, role } = getAuthTarget(String(sessionUser.loginType || 'resident'));
+    const { collectionName, role } = getAuthTarget(String(sessionUser.loginType || 'reception'));
     const db = mongoose.connection && mongoose.connection.db;
     if (!db) {
       throw new Error('Database connection is not ready.');
@@ -576,7 +464,7 @@ router.put('/profile', async (req, res) => {
   }
 
   try {
-    const loginType = String(sessionUser.loginType || 'resident').toLowerCase();
+    const loginType = String(sessionUser.loginType || 'reception').toLowerCase();
     const { collectionName, role } = getAuthTarget(loginType);
     const db = mongoose.connection && mongoose.connection.db;
     if (!db) {
@@ -617,7 +505,7 @@ router.put('/profile', async (req, res) => {
 
     const residentFlatNumber = flatNumber || String(email.match(/(\d+)@chs\.com$/i)?.[1] || '').trim();
 
-    if (loginType === 'resident' && residentFlatNumber) {
+    if (false && residentFlatNumber) {
       if (residentName || familyMembers.length || req.body.familyRecordId) {
         const existingFamilyRecord = await familyCollection.findOne({
           flatNumber: residentFlatNumber,

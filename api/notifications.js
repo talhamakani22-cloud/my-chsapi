@@ -71,7 +71,7 @@ async function sendExpoPushNotifications(messages) {
 function canCreateNotification(sessionUser) {
   const role = String(sessionUser?.role || '').toLowerCase();
   const loginType = String(sessionUser?.loginType || '').toLowerCase();
-  return role === 'admin' || loginType === 'committee';
+  return role === 'manager' || loginType === 'reception';
 }
 
 function normalizeTarget(target = '') {
@@ -84,13 +84,11 @@ function normalizeTarget(target = '') {
 
 function canViewNotificationForUser(notification, sessionUser) {
   const loginType = String(sessionUser?.loginType || '').toLowerCase();
-  if (loginType === 'committee') {
+  if (loginType === 'reception') {
     return true;
   }
 
-  const target = normalizeTarget(notification?.target);
-  if (target === 'both') return loginType === 'resident' || loginType === 'reception';
-  return target === loginType;
+  return false;
 }
 
 router.get('/', async (req, res) => {
